@@ -2,6 +2,7 @@
 #define LEXER_H 1
 
 #include <stdio.h>
+#include <stdbool.h>
 
 typedef enum {
     LEX_NOT_FOUND,      /* Token not found */
@@ -29,7 +30,7 @@ typedef enum {
     LEX_AND,            /* && */
     LEX_OR,             /* || */
     LEX_ERR             /* Signals lexing error */
-} lex_token;
+} lex_token_type;
 
 extern const char* visible[];
 
@@ -38,6 +39,12 @@ typedef struct {
     char msg[100];
 } lex_error;
 
-lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err);
+typedef struct {
+    lex_token_type type;
+    char* start;
+    size_t len;
+} lex_token;
+
+bool scan(char** p, lex_token* token, lex_error* err);
 
 #endif				/* LEXER_H */

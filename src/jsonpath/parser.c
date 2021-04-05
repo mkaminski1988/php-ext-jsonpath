@@ -20,7 +20,7 @@ static int get_expression_node_count(
 
 	while (pos < lex_tok_count) {
 
-		if (lex_tok[pos] == LEX_EXPR_END) {
+		if (lex_tok[pos].type == LEX_EXPR_END) {
 			return count;
 		}
 
@@ -37,7 +37,6 @@ static bool tokenize_expression(
 	int* pos,
 	int lex_tok_count,
 	operator * tok,
-	char lex_tok_values[][PARSE_BUF_LEN],
 	parse_error* err
 ) {
 
@@ -48,7 +47,7 @@ static bool tokenize_expression(
 
 		expr_list[i].value[0] = '\0';
 
-		switch (lex_tok[*pos]) {
+		switch (lex_tok[*pos].type) {
 		case LEX_EXPR_START:
 			break;
 		case LEX_PAREN_OPEN:
@@ -71,13 +70,14 @@ static bool tokenize_expression(
 		case LEX_CUR_NODE:
 			x = 0;
 			expr_list[i].label_count = 0;
-			while ((*pos + 1) < lex_tok_count && lex_tok[(*pos) + 1] == LEX_NODE) {
+			while ((*pos + 1) < lex_tok_count && lex_tok[(*pos) + 1].type == LEX_NODE) {
 				(*pos)++;
 				if (x == MAX_NODE_DEPTH) {
 					strncpy(err->msg, "Buffer size exceeded", sizeof(err->msg));
 					return false;
 				}
-				expr_list[i].label[x] = lex_tok_values[*pos];
+
+				strncpy(expr_list[i].label[x], lex_tok[*pos].start, lex_tok[*pos].len);
 				expr_list[i].label_count++;
 				x++;
 			}
@@ -85,7 +85,7 @@ static bool tokenize_expression(
 			i++;
 			break;
 		case LEX_LITERAL:
-			if (jp_str_cpy(expr_list[i].value, PARSE_BUF_LEN, lex_tok_values[*pos], strlen(lex_tok_values[*pos])) > 0) {
+			if (jp_str_cpy(expr_list[i].value, PARSE_BUF_LEN, lex_tok[*pos].start, lex_tok[*pos].len) > 0) {
 				strncpy(err->msg, "Buffer size exceeded", sizeof(err->msg));
 				return false;
 			}
@@ -93,7 +93,7 @@ static bool tokenize_expression(
 			i++;
 			break;
 		case LEX_LITERAL_BOOL:
-			if (jp_str_cpy(expr_list[i].value, PARSE_BUF_LEN, lex_tok_values[*pos], strlen(lex_tok_values[*pos])) > 0) {
+			if (jp_str_cpy(expr_list[i].value, PARSE_BUF_LEN, lex_tok[*pos].start, lex_tok[*pos].len) > 0) {
 				strncpy(err->msg, "Buffer size exceeded", sizeof(err->msg));
 				return false;
 			}
@@ -174,7 +174,6 @@ static bool tokenize_expression(
 
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
-	char lex_tok_values[][PARSE_BUF_LEN],
 	int lex_tok_count,
 	operator * tok,
 	int* tok_count,
@@ -190,7 +189,7 @@ bool build_parse_tree(
 		// Initialize to sentinel value
 		tok[x].filter_type = -1;
 
-		switch (lex_tok[i]) {
+		switch (lex_tok[i].type) {
 
 		case LEX_WILD_CARD:
 			tok[x].type = WILD_CARD;
@@ -200,10 +199,10 @@ bool build_parse_tree(
 		case LEX_DEEP_SCAN:
 		case LEX_NODE:
 
-			if (lex_tok[i] == ROOT) {
+			if (lex_tok[i].type == ROOT) {
 				tok[x].type = ROOT;
 			}
-			else if (lex_tok[i] == LEX_DEEP_SCAN) {
+			else if (lex_tok[i].type == LEX_DEEP_SCAN) {
 				tok[x].type = DEEP_SCAN;
 				i++;
 			}
@@ -213,12 +212,12 @@ bool build_parse_tree(
 
 			tok[x].filter_type = FLTR_NODE;
 			tok[x].index_count = 0;
-			tok[x].node_value = lex_tok_values[i];
-			tok[x].node_value_len = strlen(lex_tok_values[i]);
+			tok[x].node_value = lex_tok[i].start;
+			tok[x].node_value_len = lex_tok[i].len;
 
 			int_ptr = &i;
 
-			if (i < lex_tok_count - 1 && lex_tok[i + 1] == LEX_EXPR_START) {
+			if (i < lex_tok_count - 1 && lex_tok[i + 1].type == LEX_EXPR_START) {
 
 				expr_count = get_expression_node_count(&lex_tok[0], *int_ptr, lex_tok_count);
 
@@ -230,17 +229,17 @@ bool build_parse_tree(
 				i++;
 				tok[x].filter_type = FLTR_EXPR;
 				tok[x].expressions = (expr_operator*)jpath_malloc(sizeof(expr_operator) * expr_count);
-				if (!tokenize_expression(&lex_tok[0], int_ptr, lex_tok_count, &tok[x], lex_tok_values, err)) {
+				if (!tokenize_expression(&lex_tok[0], int_ptr, lex_tok_count, &tok[x], err)) {
 					return false;
 				}
 			}
-			else if (i < lex_tok_count - 1 && lex_tok[i + 1] == LEX_FILTER_START) {
+			else if (i < lex_tok_count - 1 && lex_tok[i + 1].type == LEX_FILTER_START) {
 
 				if (i < lex_tok_count - 2) {
 
 					i += 2;
 
-					if (lex_tok[i] == LEX_EXPR_END) {
+					if (lex_tok[i].type == LEX_EXPR_END) {
 						strncpy(err->msg, "Filter must not be empty", sizeof(err->msg));
 						return false;
 					}
@@ -249,11 +248,11 @@ bool build_parse_tree(
 					slice_counter = 0;
 					//TODO What if only 1 element, make sure type doesn't change
 					tok[x].filter_type = FLTR_INDEX;
-					while (lex_tok[i] != LEX_EXPR_END) {
-						if (lex_tok[i] == LEX_CHILD_SEP) {
+					while (lex_tok[i].type != LEX_EXPR_END) {
+						if (lex_tok[i].type == LEX_CHILD_SEP) {
 							tok[x].filter_type = FLTR_INDEX;
 						}
-						else if (lex_tok[i] == LEX_SLICE) {
+						else if (lex_tok[i].type == LEX_SLICE) {
 							tok[x].filter_type = FLTR_RANGE;
 							slice_counter++;
 							// [:a] => [0:a]
@@ -269,11 +268,16 @@ bool build_parse_tree(
 								z++;
 							}
 						}
-						else if (lex_tok[i] == LEX_WILD_CARD) {
+						else if (lex_tok[i].type == LEX_WILD_CARD) {
 							tok[x].filter_type = FLTR_WILD_CARD;
 						}
-						else if (lex_tok[i] == LEX_LITERAL) {
-							tok[x].indexes[z] = atoi(lex_tok_values[i]);	//TODO error checking
+						else if (lex_tok[i].type == LEX_LITERAL) {
+							char buf[100];
+							if (jp_str_cpy(buf, 100, lex_tok[i].start, lex_tok[i].len) > 0) {
+								strncpy(err->msg, "Buffer size exceeded", sizeof(err->msg));
+								return false;
+							}
+							tok[x].indexes[z] = atoi(buf);
 							tok[x].index_count++;
 							z++;
 						}
@@ -284,7 +288,7 @@ bool build_parse_tree(
 					}
 				}
 
-				if (lex_tok[i] != LEX_EXPR_END) {
+				if (lex_tok[i].type != LEX_EXPR_END) {
 					strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
 					return false;
 				}

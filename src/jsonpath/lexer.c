@@ -6,10 +6,10 @@
 #include "safe_string.h"
 #include <stdbool.h>
 
-static bool extract_quoted_literal(char* p, char* buffer, size_t bufSize, lex_error* err);
-static bool extract_unbounded_literal(char* p, char* buffer, size_t bufSize, lex_error* err);
-static bool extract_unbounded_numeric_literal(char* p, char* buffer, size_t bufSize, lex_error* err);
-static bool extract_boolean_literal(char* p, char* buffer, size_t bufSize, lex_error* err);
+static bool extract_quoted_literal(char* p, lex_token *tok, lex_error* err);
+static void extract_unbounded_literal(char* p, lex_token *tok);
+static void extract_unbounded_numeric_literal(char* p, lex_token *tok);
+static void extract_boolean_literal(char* p, lex_token *tok);
 
 const char* visible[] = {
 	"NOT_FOUND",    /* Token not found */
@@ -36,42 +36,40 @@ const char* visible[] = {
 	"FILTER_START"  /* [ */
 };
 
-lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
+bool scan(char** p, lex_token* tok, lex_error* err)
 {
 	char* start = *p;
-	lex_token found_token = LEX_NOT_FOUND;
+	tok->type = LEX_NOT_FOUND;
 
-	while (**p != '\0' && found_token == LEX_NOT_FOUND) {
+	while (**p != '\0' && tok->type == LEX_NOT_FOUND) {
 
 		switch (**p) {
 
 		case '$':
-			found_token = LEX_ROOT;
+			tok->type = LEX_ROOT;
 			break;
 		case '.':
 
 			switch (*(*p + 1)) {
 			case '.':
-				found_token = LEX_DEEP_SCAN;
+				tok->type = LEX_DEEP_SCAN;
 				break;
 			case '[':
 				break;		/* dot is superfluous in .['node'] */
 			case '*':
 				break;		/* get in next loop */
 			default:
-				found_token = LEX_NODE;
+				tok->type = LEX_NODE;
 				break;
 
 			}
 
-			if (found_token == LEX_NODE) {
+			if (tok->type == LEX_NODE) {
 				(*p)++;
 
-				if (!extract_unbounded_literal(*p, buffer, bufSize, err)) {
-					return LEX_ERR;
-				}
+				extract_unbounded_literal(*p, tok);
 
-				*p += strlen(buffer) - 1;
+				*p += tok->len - 1;
 			}
 
 			break;
@@ -82,65 +80,65 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 
 			switch (**p) {
 			case '\'':
-				if (!extract_quoted_literal(*p, buffer, bufSize, err)) {
-					return LEX_ERR;
+				if (!extract_quoted_literal(*p, tok, err)) {
+					return false;
 				}
-				*p += strlen(buffer) + 2;
+				*p += tok->len + 2;
 
 				for (; **p != '\0' && **p == ' '; (*p)++);
 
 				if (**p != ']') {
 					err->pos = *p;
 					strcpy(err->msg, "Missing closing ] bracket");
-					return LEX_ERR;
+					return false;
 				}
-				found_token = LEX_NODE;
+				tok->type = LEX_NODE;
 				break;
 			case '"':
-				if (!extract_quoted_literal(*p, buffer, bufSize, err)) {
-					return LEX_ERR;
+				if (!extract_quoted_literal(*p, tok, err)) {
+					return false;
 				}
-				*p += strlen(buffer) + 2;
+				*p += tok->len + 2;
 
 				for (; **p != '\0' && **p == ' '; (*p)++);
 
 				if (**p != ']') {
 					err->pos = *p;
 					strcpy(err->msg, "Missing closing ] bracket");
-					return LEX_ERR;
+					return false;
 				}
-				found_token = LEX_NODE;
+				tok->type = LEX_NODE;
 				break;
 			case '?':
-				found_token = LEX_EXPR_START;
+				tok->type = LEX_EXPR_START;
 				break;
 			default:
 				/* Pick up start in next iteration, maybe simplify */
 				(*p)--;
-				found_token = LEX_FILTER_START;
+				tok->type = LEX_FILTER_START;
 				break;
 			}
 			break;
 		case ']':
-			found_token = LEX_EXPR_END;
+			tok->type = LEX_EXPR_END;
 			break;
 		case '@':
-			found_token = LEX_CUR_NODE;
+			tok->type = LEX_CUR_NODE;
 			break;
 		case ':':
-			found_token = LEX_SLICE;
+			tok->type = LEX_SLICE;
 			break;
 		case ',':
-			found_token = LEX_CHILD_SEP;
+			tok->type = LEX_CHILD_SEP;
 			break;
 		case '=':
 			(*p)++;
 
 			if (**p == '=') {
-				found_token = LEX_EQ;
+				tok->type = LEX_EQ;
 			}
 			else if (**p == '~') {
-				found_token = LEX_RGXP;
+				tok->type = LEX_RGXP;
 			}
 
 			break;
@@ -150,27 +148,27 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 			if (**p != '=') {
 				err->pos = *p;
 				strcpy(err->msg, "! operator missing =");
-				return LEX_ERR;
+				return false;
 			}
 
-			found_token = LEX_NEQ;
+			tok->type = LEX_NEQ;
 			break;
 		case '>':
 			if (*(*p + 1) == '=') {
-				found_token = LEX_GTE;
+				tok->type = LEX_GTE;
 				(*p)++;
 			}
 			else {
-				found_token = LEX_GT;
+				tok->type = LEX_GT;
 			}
 			break;
 		case '<':
 			if (*(*p + 1) == '=') {
-				found_token = LEX_LTE;
+				tok->type = LEX_LTE;
 				(*p)++;
 			}
 			else {
-				found_token = LEX_LT;
+				tok->type = LEX_LT;
 			}
 			break;
 		case '&':
@@ -179,10 +177,10 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 			if (**p != '&') {
 				err->pos = *p;
 				strcpy(err->msg, "'And' operator must be double &&");
-				return LEX_ERR;
+				return false;
 			}
 
-			found_token = LEX_AND;
+			tok->type = LEX_AND;
 			break;
 		case '|':
 			(*p)++;
@@ -190,51 +188,47 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 			if (**p != '|') {
 				err->pos = *p;
 				strcpy(err->msg, "'Or' operator must be double ||");
-				return LEX_ERR;
+				return false;
 			}
 
-			found_token = LEX_OR;
+			tok->type = LEX_OR;
 			break;
 		case '(':
-			found_token = LEX_PAREN_OPEN;
+			tok->type = LEX_PAREN_OPEN;
 			break;
 		case ')':
-			found_token = LEX_PAREN_CLOSE;
+			tok->type = LEX_PAREN_CLOSE;
 			break;
 		case '\'':
-			if (!extract_quoted_literal(*p, buffer, bufSize, err)) {
-				return LEX_ERR;
+			if (!extract_quoted_literal(*p, tok, err)) {
+					return false;
 			}
-			*p += strlen(buffer) + 1;
-			found_token = LEX_LITERAL;
+			*p += tok->len + 1;
+			tok->type = LEX_LITERAL;
 			break;
 		case '"':
-			if (!extract_quoted_literal(*p, buffer, bufSize, err)) {
-				return LEX_ERR;
+			if (!extract_quoted_literal(*p, tok, err)) {
+				return false;
 			}
-			*p += strlen(buffer) + 1;
-			found_token = LEX_LITERAL;
+			*p += tok->len + 1;
+			tok->type = LEX_LITERAL;
 			break;
 		case '*':
-			found_token = LEX_WILD_CARD;
+			tok->type = LEX_WILD_CARD;
 			break;
 		case 't':
 		case 'f':
-			if (!extract_boolean_literal(*p, buffer, bufSize, err)) {
-				return LEX_ERR;
-			}
-			*p += strlen(buffer) - 1;
-			found_token = LEX_LITERAL_BOOL;
+			extract_boolean_literal(*p, tok);
+			*p += tok->len - 1;
+			tok->type = LEX_LITERAL_BOOL;
 			break;
 		case '-':
 			if (!isdigit(*(*p + 1))) {
-				return LEX_ERR;
+				return false;
 			}
-			if (!extract_unbounded_numeric_literal(*p, buffer, bufSize, err)) {
-				return LEX_ERR;
-			}
-			*p += strlen(buffer) - 1;
-			found_token = LEX_LITERAL;
+			extract_unbounded_numeric_literal(*p, tok);
+			*p += tok->len - 1;
+			tok->type = LEX_LITERAL;
 			break;
 		case '0':
 		case '1':
@@ -246,22 +240,20 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 		case '7':
 		case '8':
 		case '9':
-			if (!extract_unbounded_numeric_literal(*p, buffer, bufSize, err)) {
-				return LEX_ERR;
-			}
-			*p += strlen(buffer) - 1;
-			found_token = LEX_LITERAL;
+			extract_unbounded_numeric_literal(*p, tok);
+			*p += tok->len - 1;
+			tok->type = LEX_LITERAL;
 			break;
 		}
 
 		(*p)++;
 	}
 
-	return found_token;
+	return tok->type;
 }
 
 /* Extract contents of string bounded by either single or double quotes */
-static bool extract_quoted_literal(char* p, char* buffer, size_t bufSize, lex_error* err)
+static bool extract_quoted_literal(char* p, lex_token *tok, lex_error* err)
 {
 	char* start;
 	char quote_type;
@@ -284,55 +276,33 @@ static bool extract_quoted_literal(char* p, char* buffer, size_t bufSize, lex_er
 		return false;
 	}
 
-	start = p;
+	tok->start = p;
 
 	for (; *p != '\0' && *p != quote_type && *(p - 1) != '\\'; p++);
 
-	cpy_len = (size_t)(p - start);
-
-	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
-		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
-		return false;
-	}
+	tok->len = (size_t)(p - tok->len);
 
 	return true;
 }
 
 /* Extract literal without clear bounds that ends in non alpha-numeric char */
-static bool extract_unbounded_literal(char* p, char* buffer, size_t bufSize, lex_error* err)
+static void extract_unbounded_literal(char* p, lex_token *tok)
 {
-
-	char* start;
-	size_t cpy_len;
-
 	for (; *p != '\0' && *p == ' '; p++);
 
-	start = p;
+	tok->start = p;
 
 	for (; *p != '\0' && !isspace(*p) && (*p == '_' || *p == '-' || !ispunct(*p)); p++);
 
-	cpy_len = (size_t)(p - start);
-
-	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
-		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
-		return false;
-	}
-
-	return true;
+	tok->len = (size_t)(p - tok->len);
 }
 
 /* Extract literal without clear bounds that ends in non alpha-numeric char */
-static bool extract_unbounded_numeric_literal(char* p, char* buffer, size_t bufSize, lex_error* err)
+static void extract_unbounded_numeric_literal(char* p, lex_token *tok)
 {
-
-	char* start;
-	size_t cpy_len;
-
 	for (; *p != '\0' && *p == ' '; p++);
 
-	start = p;
+	tok->start = p;
 
 	if (*p == '-') {
 		p++;
@@ -347,36 +317,17 @@ static bool extract_unbounded_numeric_literal(char* p, char* buffer, size_t bufS
 		for (; isdigit(*p); p++);
 	}
 
-	cpy_len = (size_t)(p - start);
-
-	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
-		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
-		return false;
-	}
-
-	return true;
+	tok->len = (size_t)(p - tok->len);
 }
 
 /* Extract boolean */
-static bool extract_boolean_literal(char* p, char* buffer, size_t bufSize, lex_error* err)
+static void extract_boolean_literal(char* p, lex_token *tok)
 {
-	char* start;
-	size_t cpy_len;
-
 	for (; *p != '\0' && *p == ' '; p++);
 
-	start = p;
+	tok->start = p;
 
 	for (; *p != '\0' && !isspace(*p) && (*p == '_' || *p == '-' || !ispunct(*p)); p++);
 
-	cpy_len = (size_t)(p - start);
-
-	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
-		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
-		return false;
-	}
-
-	return true;
+	tok->len = (size_t)(p - tok->len);
 }
