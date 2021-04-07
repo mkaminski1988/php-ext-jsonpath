@@ -19,11 +19,11 @@
 /* True global resources - no need for thread safety here */
 static int le_jsonpath;
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count);
-void iterate(zval* arr, operator * tok, operator * tok_last, zval* return_value);
+void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
 void recurse(zval* arr, operator * tok, operator * tok_last, zval* return_value);
 void resolvePropertySelectorValue(zval* arr, expr_operator* node);
 void resolveIssetSelector(zval* arr, expr_operator* node);
-void processChildKey(zval* arr, operator * tok, operator * tok_last, zval* return_value);
+void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr);
 void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* return_value);
 bool is_scalar(zval* arg);
 
@@ -63,38 +63,35 @@ PHP_METHOD(JsonPath, find)
     int tok_count = 0;
     parse_error p_err;
 
-    if (!build_parse_tree(lex_tok, lex_tok_literals, lex_tok_count, tok, &tok_count, &p_err)) {
+    struct ast_node head;
+
+    if (!build_parse_tree(lex_tok, lex_tok_literals, lex_tok_count, &head, &tok_count, &p_err)) {
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
-    operator * tok_ptr_start = &tok[0];
-    operator * tok_ptr_end = &tok[tok_count - 1];
-
     array_init(return_value);
 
-    iterate(search_target, tok_ptr_start, tok_ptr_end, return_value);
+    evaluateAST(search_target, head.data.d_selector.next, return_value);
 
-    /* free the memory allocated for filter expressions */
+    // /* free the memory allocated for filter expressions */
 
-    operator * fr = tok_ptr_start;
+    // operator * fr = tok_ptr_start;
 
-    while (fr <= tok_ptr_end) {
-        if (fr->filter_type == FLTR_EXPR) {
-            efree((void*)fr->expressions);
-        }
-        fr++;
-    }
+    // while (fr <= tok_ptr_end) {
+    //     if (fr->filter_type == FLTR_EXPR) {
+    //         efree((void*)fr->expressions);
+    //     }
+    //     fr++;
+    // }
 
-    /* return false if no results were found by the JSON-path query */
+    // /* return false if no results were found by the JSON-path query */
 
     if (zend_hash_num_elements(HASH_OF(return_value)) == 0) {
         convert_to_boolean(return_value);
         RETURN_FALSE;
     }
-
-    return;
 }
 
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count)
@@ -138,30 +135,25 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
     return true;
 }
 
-void iterate(zval* arr, operator * tok, operator * tok_last, zval* return_value)
+void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
 {
-    if (tok > tok_last) {
-        return;
-    }
-
-    switch (tok->type) {
-    case ROOT:
-        if (tok->filter_type == FLTR_RANGE || tok->filter_type == FLTR_INDEX) {
-            processChildKey(arr, tok, tok_last, return_value);
+    while (tok != NULL) {
+        switch (tok->type) {
+        case AST_ROOT:
+            printf("Iterate: AST_ROOT\n");
+            tok = tok->data.d_selector.next;
+            break;
+        // case WILD_CARD:
+        //     iterateWildCard(arr, tok, tok_last, return_value);
+        //     return;
+        // case DEEP_SCAN:
+        //     recurse(arr, tok, tok_last, return_value);
+        //     return;
+        case AST_SELECTOR:
+            printf("Iterate: AST_SELECTOR %s\n", tok->data.d_selector.value);
+            execSelectorChain(&arr, &tok, return_value, true);
+            return;
         }
-        else {
-            iterate(arr, (tok + 1), tok_last, return_value);
-        }
-        break;
-    case WILD_CARD:
-        iterateWildCard(arr, tok, tok_last, return_value);
-        return;
-    case DEEP_SCAN:
-        recurse(arr, tok, tok_last, return_value);
-        return;
-    case CHILD_KEY:
-        processChildKey(arr, tok, tok_last, return_value);
-        return;
     }
 }
 
@@ -173,216 +165,75 @@ void copyToReturnResult(zval* arr, zval* return_value)
     add_next_index_zval(return_value, &tmp);
 }
 
-void processChildKey(zval* arr, operator * tok, operator * tok_last, zval* return_value)
+void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr)
 {
-    zval* data, * data2;
+    zval* c_arr = *arr;
+    struct ast_node* c_tok = *tok;
 
-    if (Z_TYPE_P(arr) != IS_ARRAY) {
-        return;
-    }
+    while (c_tok != NULL && c_tok->type == AST_SELECTOR) {
 
-    // Sometimes we want to loop through the whole array. Examples:
-    // $..[*]
-    // $[0:6]
-    if (tok->node_value_len == 0 && (tok->type == ROOT || tok->type == DEEP_SCAN)) {
-        data = arr;
-    }
-    // And sometimes we're interested only in a particular key. Examples:
-    // $['somekey']
-    // $.somekey
-    else if ((data = zend_hash_str_find(HASH_OF(arr), tok->node_value, tok->node_value_len)) == NULL) {
-        return;
-    }
-
-    int x;
-    zend_string* key;
-    zend_ulong num_key;
-    int range_start;
-    int range_end;
-    int range_step;
-    int data_length;
-
-    switch (tok->filter_type) {
-    case FLTR_RANGE:
-        data_length = zend_hash_num_elements(HASH_OF(data));
-
-        range_start = tok->indexes[0];
-        range_end = tok->index_count > 1 ? tok->indexes[1] : INT_MAX;
-        range_step = tok->index_count > 2 ? tok->indexes[2] : 1;
-
-        // Zero-steps are not allowed, abort
-        if (range_step == 0) {
+        if (Z_TYPE_P(c_arr) != IS_ARRAY) {
             return;
         }
 
-        // Replace placeholder with actual value
-        if (range_start == INT_MAX) {
-            range_start = range_step > 0 ? 0 : data_length - 1;
-        }
-        // Indexing from the end of the list
-        else if (range_start < 0) {
-            range_start = data_length - abs(range_start);
+        printf("execSelectorChain, has %s?\n", c_tok->data.d_selector.value);
+
+        if ((c_arr = zend_hash_str_find(HASH_OF(c_arr), c_tok->data.d_selector.value, strlen(c_tok->data.d_selector.value))) == NULL) {
+            printf("Found null, returning\n");
+            return;
         }
 
-        // Replace placeholder with actual value
-        if (range_end == INT_MAX) {
-            range_end = range_step > 0 ? data_length : -1;
-        }
-        // Indexing from the end of the list
-        else if (range_end < 0) {
-            range_end = data_length - abs(range_end);
+        if (c_tok->data.d_selector.next == NULL) {
+            printf("execSelectorChain, at last selector %s, copying to result\n", c_tok->data.d_selector.value);
         }
 
-        // Set suitable boundaries for start index
-        range_start = range_start < -1 ? -1 : range_start;
-        range_start = range_start > data_length ? data_length : range_start;
+        c_tok = c_tok->data.d_selector.next;
+    }
 
-        // Set suitable boundaries for end index
-        range_end = range_end < -1 ? -1 : range_end;
-        range_end = range_end > data_length ? data_length : range_end;
+    copyToReturnResult(c_arr, return_value);
 
-        if (range_step > 0) {
-            // Make sure that the range is sane so we don't end up in an infinite loop
-            if (range_start >= range_end) {
-                return;
-            }
-
-            for (x = range_start; x < range_end; x += range_step) {
-                if ((data2 = zend_hash_index_find(HASH_OF(data), x)) != NULL) {
-                    if (tok == tok_last) {
-                        copyToReturnResult(data2, return_value);
-                    }
-                    else {
-                        iterate(data2, (tok + 1), tok_last, return_value);
-                    }
-                }
-            }
-        }
-        else {
-            // Make sure that the range is sane so we don't end up in an infinite loop
-            if (range_start <= range_end) {
-                return;
-            }
-
-            for (x = range_start; x > range_end; x += range_step) {
-                if ((data2 = zend_hash_index_find(HASH_OF(data), x)) != NULL) {
-                    if (tok == tok_last) {
-                        copyToReturnResult(data2, return_value);
-                    }
-                    else {
-                        iterate(data2, (tok + 1), tok_last, return_value);
-                    }
-                }
-            }
-        }
-        return;
-    case FLTR_INDEX:
-        for (x = 0; x < tok->index_count; x++) {
-            if (tok->indexes[x] < 0) {
-                tok->indexes[x] = zend_hash_num_elements(HASH_OF(data)) - abs(tok->indexes[x]);
-            }
-            if ((data2 = zend_hash_index_find(HASH_OF(data), tok->indexes[x])) != NULL) {
-                if (tok == tok_last) {
-                    copyToReturnResult(data2, return_value);
-                }
-                else {
-                    iterate(data2, (tok + 1), tok_last, return_value);
-                }
-            }
-        }
-        return;
-    case FLTR_WILD_CARD:
-
-        ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(data), num_key, key, data2) {
-            if (tok == tok_last) {
-                copyToReturnResult(data2, return_value);
-            }
-            else {
-                iterate(data2, (tok + 1), tok_last, return_value);
-            }
-        }
-        ZEND_HASH_FOREACH_END();
-
-        return;
-    case FLTR_NODE:
-        if (tok == tok_last) {
-            copyToReturnResult(data, return_value);
-        }
-        else {
-            iterate(data, (tok + 1), tok_last, return_value);
-        }
-        return;
-    case FLTR_EXPR:
-
-        ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(data), num_key, key, data2) {
-            // For each array entry, find the node names and populate their values
-            // Fill up expression NODE_NAME VALS
-            for (x = 0; x < tok->expression_count; x++) {
-                if (x < tok->expression_count - 1 && tok->expressions[x + 1].type == EXPR_ISSET) {
-                    resolveIssetSelector(data2, &tok->expressions[x]);
-                }
-                else if (tok->expressions[x].type == EXPR_NODE_NAME) {
-                    resolvePropertySelectorValue(data2, &tok->expressions[x]);
-                }
-            }
-
-            if (evaluate_postfix_expression(tok->expressions, tok->expression_count)) {
-                if (tok == tok_last) {
-                    copyToReturnResult(data2, return_value);
-                }
-                else {
-                    iterate(data2, (tok + 1), tok_last, return_value);
-                }
-            }
-
-            // Clean up node values to prevent incorrect node values during recursive wildcard iterations
-            for (x = 0; x < tok->expression_count; x++) {
-                if (tok->expressions[x].type == EXPR_NODE_NAME) {
-                    tok->expressions[x].value[0] = '\0';
-                }
-            }
-        }
-        ZEND_HASH_FOREACH_END();
-
-        break;
+    if (update_ptr) {
+        *arr = c_arr;
+        *tok = c_tok;
     }
 }
 
+
 void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* return_value)
 {
-    zval* data;
-    zval* zv_dest;
-    zend_string* key;
-    zend_ulong num_key;
+    // zval* data;
+    // zval* zv_dest;
+    // zend_string* key;
+    // zend_ulong num_key;
 
-    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
-        if (tok == tok_last) {
-            copyToReturnResult(data, return_value);
-        }
-        else if (Z_TYPE_P(data) == IS_ARRAY) {
-            iterate(data, (tok + 1), tok_last, return_value);
-        }
-    }
-    ZEND_HASH_FOREACH_END();
+    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
+    //     if (tok == tok_last) {
+    //         copyToReturnResult(data, return_value);
+    //     }
+    //     else if (Z_TYPE_P(data) == IS_ARRAY) {
+    //         evaluateAST(data, (tok + 1), tok_last, return_value);
+    //     }
+    // }
+    // ZEND_HASH_FOREACH_END();
 }
 
 void recurse(zval* arr, operator * tok, operator * tok_last, zval* return_value)
 {
-    if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
-        return;
-    }
+    // if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
+    //     return;
+    // }
 
-    processChildKey(arr, tok, tok_last, return_value);
+    // execSelectorChain(arr, tok, tok_last, return_value);
 
-    zval* data;
-    zval* zv_dest;
-    zend_string* key;
-    zend_ulong num_key;
+    // zval* data;
+    // zval* zv_dest;
+    // zend_string* key;
+    // zend_ulong num_key;
 
-    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
-        recurse(data, tok, tok_last, return_value);
-    }
-    ZEND_HASH_FOREACH_END();
+    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
+    //     recurse(data, tok, tok_last, return_value);
+    // }
+    // ZEND_HASH_FOREACH_END();
 }
 
 /* populate the expression operator with the array value that */

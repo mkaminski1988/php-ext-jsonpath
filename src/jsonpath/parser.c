@@ -10,6 +10,13 @@ int get_operator_precedence(expr_op_type type);
 
 // Return node count (not including last token)
 
+struct ast_node* ast_alloc_node(enum ast_type type) {
+    struct ast_node* ptr = emalloc(sizeof(struct ast_node));
+	ptr->data.d_selector.next = NULL;
+	ptr->type = type;
+	return ptr;
+}
+
 static int get_expression_node_count(
 	lex_token* lex_tok,
 	int pos,
@@ -176,10 +183,12 @@ bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
 	int lex_tok_count,
-	operator * tok,
+	struct ast_node * head,
 	int* tok_count,
 	parse_error* err
 ) {
+
+	struct ast_node* cur = head;
 
 	int i = 0, x = 0, z = 0, expr_count = 0;
 	int slice_counter = 0;
@@ -187,108 +196,18 @@ bool build_parse_tree(
 
 	for (i = 0; i < lex_tok_count; i++) {
 
-		// Initialize to sentinel value
-		tok[x].filter_type = -1;
-
 		switch (lex_tok[i]) {
-
-		case LEX_WILD_CARD:
-			tok[x].type = WILD_CARD;
+		case ROOT:
+			printf("Parsing ROOT...\n");
+			cur->data.d_selector.next = ast_alloc_node(AST_ROOT);
+			cur = cur->data.d_selector.next;
 			x++;
 			break;
-		case ROOT:
-		case LEX_DEEP_SCAN:
 		case LEX_NODE:
-
-			if (lex_tok[i] == ROOT) {
-				tok[x].type = ROOT;
-			}
-			else if (lex_tok[i] == LEX_DEEP_SCAN) {
-				tok[x].type = DEEP_SCAN;
-				i++;
-			}
-			else {
-				tok[x].type = CHILD_KEY;
-			}
-
-			tok[x].filter_type = FLTR_NODE;
-			tok[x].index_count = 0;
-			tok[x].node_value = lex_tok_values[i];
-			tok[x].node_value_len = strlen(lex_tok_values[i]);
-
-			int_ptr = &i;
-
-			if (i < lex_tok_count - 1 && lex_tok[i + 1] == LEX_EXPR_START) {
-
-				expr_count = get_expression_node_count(&lex_tok[0], *int_ptr, lex_tok_count);
-
-				if (expr_count == -1) {
-					strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
-					return false;
-				}
-
-				i++;
-				tok[x].filter_type = FLTR_EXPR;
-				tok[x].expressions = (expr_operator*)jpath_malloc(sizeof(expr_operator) * expr_count);
-				if (!tokenize_expression(&lex_tok[0], int_ptr, lex_tok_count, &tok[x], lex_tok_values, err)) {
-					return false;
-				}
-			}
-			else if (i < lex_tok_count - 1 && lex_tok[i + 1] == LEX_FILTER_START) {
-
-				if (i < lex_tok_count - 2) {
-
-					i += 2;
-
-					if (lex_tok[i] == LEX_EXPR_END) {
-						strncpy(err->msg, "Filter must not be empty", sizeof(err->msg));
-						return false;
-					}
-
-					z = 0;
-					slice_counter = 0;
-					//TODO What if only 1 element, make sure type doesn't change
-					tok[x].filter_type = FLTR_INDEX;
-					while (lex_tok[i] != LEX_EXPR_END) {
-						if (lex_tok[i] == LEX_CHILD_SEP) {
-							tok[x].filter_type = FLTR_INDEX;
-						}
-						else if (lex_tok[i] == LEX_SLICE) {
-							tok[x].filter_type = FLTR_RANGE;
-							slice_counter++;
-							// [:a] => [0:a]
-							// [a::] => [a:0:]
-							if (slice_counter > tok[x].index_count) {
-								if (slice_counter == 1) {
-									tok[x].indexes[z] = INT_MAX;
-								}
-								else if (slice_counter == 2) {
-									tok[x].indexes[z] = INT_MAX;
-								}
-								tok[x].index_count++;
-								z++;
-							}
-						}
-						else if (lex_tok[i] == LEX_WILD_CARD) {
-							tok[x].filter_type = FLTR_WILD_CARD;
-						}
-						else if (lex_tok[i] == LEX_LITERAL) {
-							tok[x].indexes[z] = atoi(lex_tok_values[i]);	//TODO error checking
-							tok[x].index_count++;
-							z++;
-						}
-						else {
-							break;
-						}
-						i++;
-					}
-				}
-
-				if (lex_tok[i] != LEX_EXPR_END) {
-					strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
-					return false;
-				}
-			}
+			printf("Parsing LEX_NODE...\n");
+			cur->data.d_selector.next = ast_alloc_node(AST_SELECTOR);
+			cur = cur->data.d_selector.next;
+			strcpy(cur->data.d_selector.value, lex_tok_values[i]);
 			x++;
 			break;
 		default:

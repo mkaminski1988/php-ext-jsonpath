@@ -4,8 +4,34 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <Zend/zend_smart_str.h>
+
 #define MAX_NODE_DEPTH 5
 #define PARSE_BUF_LEN 50
+
+
+/* AST stuff */
+
+enum ast_type {
+    AST_ROOT,
+    AST_SELECTOR
+};
+
+union ast_node_data {
+    struct {
+        // smart_str value;
+        char value[PARSE_BUF_LEN];
+        struct ast_node* next;
+    } d_selector;
+};
+
+struct ast_node {
+    enum ast_type type;
+    union ast_node_data data;
+};
+
+/* AST stuff */
+
 
 typedef enum {
     DEFAULT,
@@ -89,14 +115,24 @@ bool compare_isset(expr_operator* lh, expr_operator* rh);	// lh = rh
 bool compare_rgxp(expr_operator* lh, expr_operator* rh);
 
 bool build_parse_tree(
-    lex_token lex_tok[PARSE_BUF_LEN],
-    char lex_tok_values[][PARSE_BUF_LEN],
-    int lex_tok_count,
-    operator * tok,
-    int* tok_count,
-    parse_error* err
+	lex_token lex_tok[PARSE_BUF_LEN],
+	char lex_tok_values[][PARSE_BUF_LEN],
+	int lex_tok_count,
+	struct ast_node * head,
+	int* tok_count,
+	parse_error* err
 );
 
 void* jpath_malloc(size_t size);
+
+
+struct ASTNode {
+
+};
+
+union NodeData {
+
+};
+
 
 #endif				/* PARSER_H */
