@@ -198,6 +198,12 @@ bool build_parse_tree(
 	for (i = 0; i < lex_tok_count; i++) {
 
 		switch (lex_tok[i]) {
+		case LEX_WILD_CARD:
+			// todo : create a macro here
+			cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
+			cur = cur->next;
+			x++;
+			break;
 		case ROOT:
 			// printf("Parsing ROOT...\n");
 			cur->next = ast_alloc_node(AST_ROOT, "AST_ROOT");

@@ -24,7 +24,7 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
 void resolvePropertySelectorValue(zval* arr, expr_operator* node);
 void resolveIssetSelector(zval* arr, expr_operator* node);
 struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy);
-void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* return_value);
+void execWildcard(zval* arr, struct ast_node* tok, zval* return_value);
 bool is_scalar(zval* arg);
 void copyToReturnResult(zval* arr, zval* return_value);
 
@@ -156,6 +156,10 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
                 tok = tok->next;
             }
             break;
+        case AST_WILD_CARD:
+            tok = tok->next;
+            execWildcard(arr, tok, return_value);
+            return;
         }
     }
 }
@@ -184,14 +188,8 @@ struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return
         return NULL;
     }
 
-    tok = tok->next;
-    
-    if (tok != NULL) {
-        if (tok->type == AST_SELECTOR) {
-            execSelectorChain(arr, tok, return_value, xy+1);
-        } else {
-            evaluateAST(arr, tok, return_value);
-        }
+    if (tok->next != NULL) {
+        evaluateAST(arr, tok->next, return_value);
     } else {
         copyToReturnResult(arr, return_value);
         return tok;
@@ -199,22 +197,22 @@ struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return
 }
 
 
-void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* return_value)
+void execWildcard(zval* arr, struct ast_node* tok, zval* return_value)
 {
-    // zval* data;
-    // zval* zv_dest;
-    // zend_string* key;
-    // zend_ulong num_key;
+    zval* data;
+    zval* zv_dest;
+    zend_string* key;
+    zend_ulong num_key;
 
-    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
-    //     if (tok == tok_last) {
-    //         copyToReturnResult(data, return_value);
-    //     }
-    //     else if (Z_TYPE_P(data) == IS_ARRAY) {
-    //         evaluateAST(data, (tok + 1), tok_last, return_value);
-    //     }
-    // }
-    // ZEND_HASH_FOREACH_END();
+    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
+        if (tok->next == NULL) {
+            copyToReturnResult(data, return_value);
+        }
+        else if (Z_TYPE_P(data) == IS_ARRAY) {
+            evaluateAST(data, tok->next, return_value);
+        }
+    }
+    ZEND_HASH_FOREACH_END();
 }
 
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy)

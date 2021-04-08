@@ -15,7 +15,8 @@
 enum ast_type {
     AST_RECURSE,
     AST_ROOT,
-    AST_SELECTOR
+    AST_SELECTOR,
+    AST_WILD_CARD
 };
 
 union ast_node_data {
