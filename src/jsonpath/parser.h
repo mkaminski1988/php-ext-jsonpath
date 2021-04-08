@@ -20,20 +20,18 @@ enum ast_type {
 
 union ast_node_data {
     struct {
-        // smart_str value;
         char value[PARSE_BUF_LEN];
-        struct ast_node* next;
     } d_selector;
 };
 
 struct ast_node {
+    struct ast_node* next;
     const char* type_s;
     enum ast_type type;
     union ast_node_data data;
 };
 
 /* AST stuff */
-
 
 typedef enum {
     DEFAULT,

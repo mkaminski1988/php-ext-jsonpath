@@ -74,7 +74,7 @@ PHP_METHOD(JsonPath, find)
 
     array_init(return_value);
 
-    struct ast_node* next = head.data.d_selector.next;
+    struct ast_node* next = head.next;
 
     evaluateAST(search_target, next, return_value);
 
@@ -143,17 +143,17 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
     while (tok != NULL) {
         switch (tok->type) {
         case AST_ROOT:
-            tok = tok->data.d_selector.next;
+            tok = tok->next;
             break;
         case AST_RECURSE:
-            tok = tok->data.d_selector.next;
+            tok = tok->next;
             execRecursiveArrayWalk(arr, tok, return_value, 0);
             return;
         case AST_SELECTOR:
             execSelectorChain(arr, tok, return_value, 0);
             // still needed?
             while (tok != NULL && tok->type == AST_SELECTOR) {
-                tok = tok->data.d_selector.next;
+                tok = tok->next;
             }
             break;
         }
@@ -184,7 +184,7 @@ struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return
         return NULL;
     }
 
-    tok = tok->data.d_selector.next;
+    tok = tok->next;
     
     if (tok != NULL) {
         if (tok->type == AST_SELECTOR) {
