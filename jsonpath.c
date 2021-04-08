@@ -215,21 +215,21 @@ void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* retur
 
 void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr)
 {
-    if (arr == NULL || Z_TYPE_P(*arr) != IS_ARRAY) {
-        return;
-    }
+    // if ((*arr) == NULL || Z_TYPE_P(*arr) != IS_ARRAY) {
+    //     return;
+    // }
 
     zval* data;
     zval* zv_dest;
     zend_string* key;
     zend_ulong num_key;
 
-    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
-        execRecursiveArrayWalk(&data, tok, return_value, false);
-    }
-    ZEND_HASH_FOREACH_END();
+    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
+        // execRecursiveArrayWalk(&data, *tok, return_value, false);
+    // }
+    // ZEND_HASH_FOREACH_END();
 
-    execSelectorChain(arr, tok, return_value, update_ptr);
+    // execSelectorChain(arr, tok, return_value, update_ptr);
 }
 
 /* populate the expression operator with the array value that */

@@ -15,4 +15,4 @@ $obj = array (
 
 $jsonPath = new JsonPath();
 
-print_r($jsonPath->find($obj, "$..book"));
+print_r($jsonPath->find($obj, "$.store"));
