@@ -173,9 +173,9 @@ void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bo
 
     while (c_tok != NULL && c_tok->type == AST_SELECTOR) {
 
-        if (Z_TYPE_P(c_arr) != IS_ARRAY) {
-            return;
-        }
+        // if (Z_TYPE_P(c_arr) != IS_ARRAY) {
+        //     return;
+        // }
 
         if ((c_arr = zend_hash_str_find(HASH_OF(c_arr), c_tok->data.d_selector.value, strlen(c_tok->data.d_selector.value))) == NULL) {
             while (c_tok != NULL && c_tok->type == AST_SELECTOR) {
@@ -219,19 +219,17 @@ void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_valu
     }
 
     printf("execRecursiveArrayWalk Type: %s Value: %s\n", (*tok)->type_s, (*tok)->data.d_selector.value);
+    execSelectorChain(arr, tok, return_value, update_ptr);
 
     zval* data;
     zval* zv_dest;
     zend_string* key;
     zend_ulong num_key;
 
-
     ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
-        execRecursiveArrayWalk(data, tok, return_value, false);
+        execRecursiveArrayWalk(&data, tok, return_value, false);
     }
     ZEND_HASH_FOREACH_END();
-
-    execSelectorChain(arr, tok, return_value, update_ptr);
 }
 
 /* populate the expression operator with the array value that */
