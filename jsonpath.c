@@ -176,7 +176,7 @@ void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bo
         }
 
         if ((c_arr = zend_hash_str_find(HASH_OF(c_arr), c_tok->data.d_selector.value, strlen(c_tok->data.d_selector.value))) == NULL) {
-            while (c_tok->type == AST_SELECTOR) {
+            while (c_tok != NULL && c_tok->type == AST_SELECTOR) {
                 c_tok = c_tok->data.d_selector.next;
             }
             break;
