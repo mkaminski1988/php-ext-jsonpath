@@ -10,7 +10,8 @@ int get_operator_precedence(expr_op_type type);
 
 // Return node count (not including last token)
 
-struct ast_node* ast_alloc_node(enum ast_type type, const char * type_s) {
+struct ast_node* ast_alloc_node(enum ast_type type, const char* type_s) {
+	printf("Allocating %s\n", type_s);
     struct ast_node* ptr = emalloc(sizeof(struct ast_node));
 	ptr->next = NULL;
 	ptr->type = type;
@@ -183,64 +184,55 @@ static bool tokenize_expression(
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
+	int* start,
 	int lex_tok_count,
 	struct ast_node* head,
-	int* tok_count,
 	parse_error* err
 ) {
 
 	struct ast_node* cur = head;
 
-	int i = 0, x = 0, z = 0, expr_count = 0;
-	int slice_counter = 0;
-	int* int_ptr;
+	for (int i = *start; i < lex_tok_count; i++) {
 
-	for (i = 0; i < lex_tok_count; i++) {
-
+		printf("Looper...\n");
 		switch (lex_tok[i]) {
 		case LEX_WILD_CARD:
 			// todo : create a macro here
 			cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
 			cur = cur->next;
-			x++;
 			break;
 		case ROOT:
 			// printf("Parsing ROOT...\n");
 			cur->next = ast_alloc_node(AST_ROOT, "AST_ROOT");
 			cur = cur->next;
-			x++;
 			break;
 		case LEX_DEEP_SCAN:
 			// printf("Parsing LEX_DEEP_SCAN...%s\n", lex_tok_values[i]);
 			cur->next = ast_alloc_node(AST_RECURSE, "AST_RECURSE");
 			cur = cur->next;
-			x++;
 			break;
 		case LEX_NODE:
 			// printf("Parsing LEX_NODE...%s\n", lex_tok_values[i]);
 			cur->next = ast_alloc_node(AST_SELECTOR, "AST_SELECTOR");
 			cur = cur->next;
 			strcpy(cur->data.d_selector.value, lex_tok_values[i]);
-			x++;
 			break;
 		case LEX_FILTER_START:
 			cur->next = ast_alloc_node(AST_FILTER, "AST_FILTER");
 			cur = cur->next;
 			cur->data.d_filter.children = ast_alloc_node(AST_ROOT, "AST_ROOT");
-			if (!build_parse_tree(lex_tok, lex_tok_values, lex_tok_count, cur->data.d_filter.children, tok_count, err)) {
+
+			i++;
+			if (!build_parse_tree(lex_tok, lex_tok_values, &i, lex_tok_count, cur->data.d_filter.children, err)) {
 				return false;
 			}
-			x++;
 			break;
 		case LEX_EXPR_END:
-			*tok_count = x;
 			return true;
 		default:
 			break;
 		}
 	}
-
-	*tok_count = x;
 
 	return true;
 }

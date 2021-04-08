@@ -122,9 +122,9 @@ bool compare_rgxp(expr_operator* lh, expr_operator* rh);
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
+	int* start,
 	int lex_tok_count,
 	struct ast_node* head,
-	int* tok_count,
 	parse_error* err
 );
 

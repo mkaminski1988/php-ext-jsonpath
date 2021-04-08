@@ -61,12 +61,13 @@ PHP_METHOD(JsonPath, find)
     /* assemble an array of query execution instructions from parsed tokens */
 
     operator tok[PARSE_BUF_LEN];
-    int tok_count = 0;
     parse_error p_err;
 
     struct ast_node head;
 
-    if (!build_parse_tree(lex_tok, lex_tok_literals, lex_tok_count, &head, &tok_count, &p_err)) {
+    int i = 0;
+
+    if (!build_parse_tree(lex_tok, lex_tok_literals, &i, lex_tok_count, &head, &p_err)) {
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
@@ -76,6 +77,7 @@ PHP_METHOD(JsonPath, find)
 
     struct ast_node* next = head.next;
 
+    printf("Evaluating...\n");
     evaluateAST(search_target, next, return_value);
 
     // /* free the memory allocated for filter expressions */
@@ -141,7 +143,12 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
 {
     while (tok != NULL) {
+        printf("evaluateAST: %s", tok->type_s);
         switch (tok->type) {
+        case AST_FILTER:
+            evaluateAST(arr, tok->data.d_filter.children, return_value);
+            tok = tok->next;
+            break;
         case AST_ROOT:
             tok = tok->next;
             break;
