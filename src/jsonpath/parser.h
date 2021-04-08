@@ -13,6 +13,7 @@
 /* AST stuff */
 
 enum ast_type {
+    AST_RECURSE,
     AST_ROOT,
     AST_SELECTOR
 };
@@ -26,6 +27,7 @@ union ast_node_data {
 };
 
 struct ast_node {
+    const char* type_s;
     enum ast_type type;
     union ast_node_data data;
 };

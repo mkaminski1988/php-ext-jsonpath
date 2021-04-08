@@ -20,7 +20,7 @@
 static int le_jsonpath;
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count);
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
-void recurse(zval* arr, operator * tok, operator * tok_last, zval* return_value);
+void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value);
 void resolvePropertySelectorValue(zval* arr, expr_operator* node);
 void resolveIssetSelector(zval* arr, expr_operator* node);
 void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr);
@@ -140,20 +140,17 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
     while (tok != NULL) {
         switch (tok->type) {
         case AST_ROOT:
-            printf("Iterate: AST_ROOT\n");
             tok = tok->data.d_selector.next;
             break;
-        // case WILD_CARD:
-        //     iterateWildCard(arr, tok, tok_last, return_value);
-        //     return;
-        // case DEEP_SCAN:
-        //     recurse(arr, tok, tok_last, return_value);
-        //     return;
+        case AST_RECURSE:
+            tok = tok->data.d_selector.next;
+            execRecursiveArrayWalk(&arr, &tok, return_value);
+            break;
         case AST_SELECTOR:
-            printf("Iterate: AST_SELECTOR %s\n", tok->data.d_selector.value);
             execSelectorChain(&arr, &tok, return_value, true);
-            return;
+            break;
         }
+        printf("Iterate: %s\n", tok->type_s);
     }
 }
 
@@ -167,6 +164,8 @@ void copyToReturnResult(zval* arr, zval* return_value)
 
 void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr)
 {
+    printf("execSelectorChain Type: %s Value: %s\n", (*tok)->type_s, (*tok)->data.d_selector.value);
+
     zval* c_arr = *arr;
     struct ast_node* c_tok = *tok;
 
@@ -176,21 +175,15 @@ void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bo
             return;
         }
 
-        printf("execSelectorChain, has %s?\n", c_tok->data.d_selector.value);
-
         if ((c_arr = zend_hash_str_find(HASH_OF(c_arr), c_tok->data.d_selector.value, strlen(c_tok->data.d_selector.value))) == NULL) {
-            printf("Found null, returning\n");
-            return;
-        }
-
-        if (c_tok->data.d_selector.next == NULL) {
-            printf("execSelectorChain, at last selector %s, copying to result\n", c_tok->data.d_selector.value);
+            while (c_tok->type == AST_SELECTOR) {
+                c_tok = c_tok->data.d_selector.next;
+            }
+            break;
         }
 
         c_tok = c_tok->data.d_selector.next;
     }
-
-    copyToReturnResult(c_arr, return_value);
 
     if (update_ptr) {
         *arr = c_arr;
@@ -217,21 +210,23 @@ void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* retur
     // ZEND_HASH_FOREACH_END();
 }
 
-void recurse(zval* arr, operator * tok, operator * tok_last, zval* return_value)
+void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value)
 {
-    // if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
-    //     return;
-    // }
+    if (arr == NULL || Z_TYPE_P(*arr) != IS_ARRAY) {
+        return;
+    }
 
-    // execSelectorChain(arr, tok, tok_last, return_value);
+    printf("execRecursiveArrayWalk Type: %s Value: %s\n", (*tok)->type_s, (*tok)->data.d_selector.value);
 
-    // zval* data;
-    // zval* zv_dest;
-    // zend_string* key;
-    // zend_ulong num_key;
+    execSelectorChain(arr, tok, return_value, true);
 
-    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
-    //     recurse(data, tok, tok_last, return_value);
+    zval* data;
+    zval* zv_dest;
+    zend_string* key;
+    zend_ulong num_key;
+
+    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
+    //     execRecursiveArrayWalk(data, tok, return_value);
     // }
     // ZEND_HASH_FOREACH_END();
 }

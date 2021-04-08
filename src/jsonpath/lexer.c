@@ -52,6 +52,7 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 
 			switch (*(*p + 1)) {
 			case '.':
+				printf("LEX_DEEP_SCAN\n");
 				found_token = LEX_DEEP_SCAN;
 				break;
 			case '[':
@@ -59,6 +60,7 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 			case '*':
 				break;		/* get in next loop */
 			default:
+				printf("LEX_NODE\n");
 				found_token = LEX_NODE;
 				break;
 
