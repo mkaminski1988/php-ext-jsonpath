@@ -150,7 +150,9 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
             execSelectorChain(&arr, &tok, return_value, true);
             break;
         }
-        printf("Iterate: %s\n", tok->type_s);
+        if (tok != NULL) {
+            printf("Iterate: %s\n", tok->type_s);
+        }
     }
 }
 
