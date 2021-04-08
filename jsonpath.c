@@ -219,6 +219,10 @@ void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* retur
 
 void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr)
 {
+    if (*tok == NULL || tok == NULL) {
+        return;
+    }
+
     if ((*arr) == NULL || Z_TYPE_P(*arr) != IS_ARRAY) {
         return;
     }
@@ -228,7 +232,7 @@ void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_valu
     zend_string* key;
     zend_ulong num_key;
 
-    execSelectorChain(arr, tok, return_value, update_ptr);
+    execSelectorChain(arr, tok, return_value, false);
 
     ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
         execRecursiveArrayWalk(&data, *tok, return_value, false);
