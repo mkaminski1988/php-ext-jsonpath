@@ -148,12 +148,10 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
         case AST_RECURSE:
             tok = tok->data.d_selector.next;
             execRecursiveArrayWalk(arr, tok, return_value, 0);
-            while (tok != NULL && tok->type == AST_SELECTOR) {
-                tok = tok->data.d_selector.next;
-            }
             return;
         case AST_SELECTOR:
             execSelectorChain(arr, tok, return_value, 0);
+            // still needed?
             while (tok != NULL && tok->type == AST_SELECTOR) {
                 tok = tok->data.d_selector.next;
             }
@@ -241,7 +239,6 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
         execRecursiveArrayWalk(data, tok, return_value, xy+1);
     }
     ZEND_HASH_FOREACH_END();
-
 }
 
 /* populate the expression operator with the array value that */
