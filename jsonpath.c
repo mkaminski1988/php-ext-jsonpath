@@ -20,7 +20,7 @@
 static int le_jsonpath;
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count);
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
-void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value);
+void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr);
 void resolvePropertySelectorValue(zval* arr, expr_operator* node);
 void resolveIssetSelector(zval* arr, expr_operator* node);
 void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr);
@@ -144,7 +144,7 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
             break;
         case AST_RECURSE:
             tok = tok->data.d_selector.next;
-            execRecursiveArrayWalk(&arr, &tok, return_value);
+            execRecursiveArrayWalk(&arr, &tok, return_value, true);
             break;
         case AST_SELECTOR:
             execSelectorChain(&arr, &tok, return_value, true);
@@ -212,7 +212,7 @@ void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* retur
     // ZEND_HASH_FOREACH_END();
 }
 
-void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value)
+void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr)
 {
     if (arr == NULL || Z_TYPE_P(*arr) != IS_ARRAY) {
         return;
@@ -220,17 +220,18 @@ void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_valu
 
     printf("execRecursiveArrayWalk Type: %s Value: %s\n", (*tok)->type_s, (*tok)->data.d_selector.value);
 
-    execSelectorChain(arr, tok, return_value, true);
-
     zval* data;
     zval* zv_dest;
     zend_string* key;
     zend_ulong num_key;
 
-    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
-    //     execRecursiveArrayWalk(data, tok, return_value);
-    // }
-    // ZEND_HASH_FOREACH_END();
+
+    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
+        execRecursiveArrayWalk(data, tok, return_value, false);
+    }
+    ZEND_HASH_FOREACH_END();
+
+    execSelectorChain(arr, tok, return_value, update_ptr);
 }
 
 /* populate the expression operator with the array value that */
