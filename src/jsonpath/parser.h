@@ -13,6 +13,7 @@
 /* AST stuff */
 
 enum ast_type {
+    AST_FILTER,
     AST_RECURSE,
     AST_ROOT,
     AST_SELECTOR,
@@ -23,6 +24,9 @@ union ast_node_data {
     struct {
         char value[PARSE_BUF_LEN];
     } d_selector;
+    struct {
+        struct ast_node* children;
+    } d_filter;
 };
 
 struct ast_node {
@@ -119,7 +123,7 @@ bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
 	int lex_tok_count,
-	struct ast_node * head,
+	struct ast_node* head,
 	int* tok_count,
 	parse_error* err
 );

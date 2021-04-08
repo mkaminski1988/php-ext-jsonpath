@@ -184,7 +184,7 @@ bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
 	int lex_tok_count,
-	struct ast_node * head,
+	struct ast_node* head,
 	int* tok_count,
 	parse_error* err
 ) {
@@ -223,6 +223,18 @@ bool build_parse_tree(
 			strcpy(cur->data.d_selector.value, lex_tok_values[i]);
 			x++;
 			break;
+		case LEX_FILTER_START:
+			cur->next = ast_alloc_node(AST_FILTER, "AST_FILTER");
+			cur = cur->next;
+			cur->data.d_filter.children = ast_alloc_node(AST_ROOT, "AST_ROOT");
+			if (!build_parse_tree(lex_tok, lex_tok_values, lex_tok_count, cur->data.d_filter.children, tok_count, err)) {
+				return false;
+			}
+			x++;
+			break;
+		case LEX_EXPR_END:
+			*tok_count = x;
+			return true;
 		default:
 			break;
 		}
