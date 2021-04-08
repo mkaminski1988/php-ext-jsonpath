@@ -199,19 +199,19 @@ bool build_parse_tree(
 
 		switch (lex_tok[i]) {
 		case ROOT:
-			printf("Parsing ROOT...\n");
+			// printf("Parsing ROOT...\n");
 			cur->data.d_selector.next = ast_alloc_node(AST_ROOT, "AST_ROOT");
 			cur = cur->data.d_selector.next;
 			x++;
 			break;
 		case LEX_DEEP_SCAN:
-			printf("Parsing LEX_DEEP_SCAN...%s\n", lex_tok_values[i]);
+			// printf("Parsing LEX_DEEP_SCAN...%s\n", lex_tok_values[i]);
 			cur->data.d_selector.next = ast_alloc_node(AST_RECURSE, "AST_RECURSE");
 			cur = cur->data.d_selector.next;
 			x++;
 			break;
 		case LEX_NODE:
-			printf("Parsing LEX_NODE...%s\n", lex_tok_values[i]);
+			// printf("Parsing LEX_NODE...%s\n", lex_tok_values[i]);
 			cur->data.d_selector.next = ast_alloc_node(AST_SELECTOR, "AST_SELECTOR");
 			cur = cur->data.d_selector.next;
 			strcpy(cur->data.d_selector.value, lex_tok_values[i]);
