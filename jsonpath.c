@@ -147,7 +147,8 @@ void evaluateAST(zval** arr, struct ast_node** tok, zval* return_value)
             break;
         case AST_RECURSE:
             tok = &(*tok)->data.d_selector.next;
-            execRecursiveArrayWalk(arr, tok, return_value, true);
+            execRecursiveArrayWalk(arr, tok, return_value, false);
+            // execSelectorChain(arr, tok, return_value, true);
             break;
         case AST_SELECTOR:
             execSelectorChain(arr, tok, return_value, true);
@@ -178,6 +179,9 @@ void execSelectorChain(zval** arr, struct ast_node** tok, zval* return_value, bo
         }
 
         if ((c_arr = zend_hash_str_find(HASH_OF(c_arr), c_tok->data.d_selector.value, strlen(c_tok->data.d_selector.value))) == NULL) {
+            while (c_tok != NULL && c_tok->type == AST_SELECTOR) {
+                c_tok = c_tok->data.d_selector.next;
+            }
             break;
         }
 
@@ -215,21 +219,21 @@ void iterateWildCard(zval* arr, operator * tok, operator * tok_last, zval* retur
 
 void execRecursiveArrayWalk(zval** arr, struct ast_node** tok, zval* return_value, bool update_ptr)
 {
-    // if ((*arr) == NULL || Z_TYPE_P(*arr) != IS_ARRAY) {
-    //     return;
-    // }
+    if ((*arr) == NULL || Z_TYPE_P(*arr) != IS_ARRAY) {
+        return;
+    }
 
     zval* data;
     zval* zv_dest;
     zend_string* key;
     zend_ulong num_key;
 
-    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
-        // execRecursiveArrayWalk(&data, *tok, return_value, false);
-    // }
-    // ZEND_HASH_FOREACH_END();
+    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(*arr), num_key, key, data) {
+        execRecursiveArrayWalk(&data, *tok, return_value, false);
+    }
+    ZEND_HASH_FOREACH_END();
 
-    // execSelectorChain(arr, tok, return_value, update_ptr);
+    execSelectorChain(arr, tok, return_value, update_ptr);
 }
 
 /* populate the expression operator with the array value that */
