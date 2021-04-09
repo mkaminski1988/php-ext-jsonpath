@@ -12,7 +12,7 @@ int get_operator_precedence(expr_op_type type);
 
 struct ast_node* ast_alloc_node(enum ast_type type, const char* type_s) {
 	// printf("Allocating %s\n", type_s);
-    struct ast_node* ptr = emalloc(sizeof(struct ast_node));
+	struct ast_node* ptr = emalloc(sizeof(struct ast_node));
 	ptr->next = NULL;
 	ptr->type = type;
 	ptr->type_s = type_s;
@@ -219,11 +219,15 @@ bool build_parse_tree(
 		case LEX_FILTER_START:
 			cur->next = ast_alloc_node(AST_FILTER, "AST_FILTER");
 			cur = cur->next;
-			cur->data.d_filter.children = ast_alloc_node(AST_ROOT, "AST_ROOT");
 
 			i++;
-			if (!build_parse_tree(lex_tok, lex_tok_values, &i, lex_tok_count, cur->data.d_filter.children, err)) {
-				return false;
+
+			if (lex_tok[i] == LEX_LITERAL || lex_tok[i] == LEX_SLICE) {
+				cur->data.d_filter.children = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
+				parseFilterList(lex_tok, lex_tok_values, &i, lex_tok_count, cur->data.d_filter.children);
+			} else {
+				cur->data.d_filter.children = ast_alloc_node(AST_ROOT, "AST_ROOT");
+				return build_parse_tree(lex_tok, lex_tok_values, &i, lex_tok_count, cur->data.d_filter.children, err);
 			}
 			break;
 		case LEX_EXPR_END:
@@ -234,6 +238,39 @@ bool build_parse_tree(
 	}
 
 	return true;
+}
+
+void parseFilterList(
+	lex_token lex_tok[PARSE_BUF_LEN],
+	char lex_tok_values[][PARSE_BUF_LEN],
+	int* start,
+	int lex_tok_count,
+	struct ast_node* tok
+) {
+
+	// printf("parseList: enter!\n");
+
+	for (int i = *start; i < lex_tok_count; i++) {
+		if (lex_tok[i] == LEX_EXPR_END) {
+			// printf("parseList: reached end of expression\n");
+			return;
+		}
+		else if (lex_tok[i] == LEX_CHILD_SEP) {
+			// printf("parseList: got a ,\n");
+			tok->type = AST_INDEX_LIST;
+			tok->type_s = "AST_INDEX_LIST";
+		}
+		else if (lex_tok[i] == LEX_SLICE) {
+			// printf("parseList: got a :\n");
+			tok->type = AST_INDEX_SLICE;
+			tok->type_s = "AST_INDEX_SLICE";
+		}
+		else if (lex_tok[i] == LEX_LITERAL) {
+			// printf("parseList: got a literal %s\n", lex_tok_values[i]);
+			tok->data.d_list.indexes[tok->data.d_list.count] = atoi(lex_tok_values[i]);
+			tok->data.d_list.count++;
+		}
+	}
 }
 
 operator_type get_token_type(expr_op_type token)

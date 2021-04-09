@@ -21,6 +21,7 @@ static int le_jsonpath;
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count);
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy);
+void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
 void resolvePropertySelectorValue(zval* arr, expr_operator* node);
 void resolveIssetSelector(zval* arr, expr_operator* node);
 struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy);
@@ -149,6 +150,10 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
             evaluateAST(arr, tok->data.d_filter.children, return_value);
             tok = tok->next;
             break;
+        case AST_INDEX_SLICE:
+            executeSlice(arr, tok, return_value);
+            tok = tok->next;
+            break;
         case AST_ROOT:
             tok = tok->next;
             break;
@@ -239,6 +244,54 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
         execRecursiveArrayWalk(data, tok, return_value, xy+1);
     }
     ZEND_HASH_FOREACH_END();
+}
+
+void executeSlice(zval* arr, struct ast_node* tok, zval* return_value)
+{
+    // TODO assert tok->type= ST_INDEX_SLICE
+
+    if (Z_TYPE_P(arr) != IS_ARRAY) {
+        return;
+    }
+
+    int range_start = 0;
+    int range_end = 0;
+    int range_step = 1;
+
+    // [a:]
+    if (tok->data.d_list.count == 1) {
+        range_start = tok->data.d_list.indexes[0];
+    }
+    // [a:b], [a:b:]
+    else if (tok->data.d_list.count == 2) {
+        range_start = tok->data.d_list.indexes[0];
+        range_end = tok->data.d_list.indexes[1];
+    }
+    // [a:b:c]
+    else if (tok->data.d_list.count == 3) {
+        range_start = tok->data.d_list.indexes[0];
+        range_end = tok->data.d_list.indexes[1];
+        if (tok->data.d_list.indexes[2] != 0) {
+            range_step = tok->data.d_list.indexes[2];
+        }
+    }
+
+    if (range_start < 0) {
+        range_start = zend_hash_num_elements(HASH_OF(arr)) - abs(range_start);
+    }
+
+    if (range_end <= 0) {
+        range_end = zend_hash_num_elements(HASH_OF(arr)) - abs(range_end);
+    }
+
+    // printf("start: %d end: %d step: %d\n", tok->data.d_list.indexes[0], tok->data.d_list.indexes[1], tok->data.d_list.indexes[2]);
+    zval* data;
+
+    for (int i = range_start; i < range_end; i += range_step) {
+        if ((data = zend_hash_index_find(HASH_OF(arr), i)) != NULL) {
+            copyToReturnResult(data, return_value);
+        }
+    }
 }
 
 /* populate the expression operator with the array value that */

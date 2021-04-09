@@ -14,19 +14,27 @@
 
 enum ast_type {
     AST_FILTER,
+    AST_INDEX_LIST,
+    AST_INDEX_SLICE,
     AST_RECURSE,
     AST_ROOT,
     AST_SELECTOR,
+    AST_UNKNOWN,
     AST_WILD_CARD
 };
 
 union ast_node_data {
     struct {
-        char value[PARSE_BUF_LEN];
-    } d_selector;
-    struct {
         struct ast_node* children;
     } d_filter;
+    struct {
+        int count;
+        union ast_node_data* names[3];
+        int indexes[3];
+    } d_list;
+    struct {
+        char value[PARSE_BUF_LEN];
+    } d_selector;
 };
 
 struct ast_node {
@@ -126,6 +134,14 @@ bool build_parse_tree(
 	int lex_tok_count,
 	struct ast_node* head,
 	parse_error* err
+);
+
+void parseFilterList(
+	lex_token lex_tok[PARSE_BUF_LEN],
+	char lex_tok_values[][PARSE_BUF_LEN],
+	int* start,
+	int lex_tok_count,
+	struct ast_node* tok
 );
 
 void* jpath_malloc(size_t size);
