@@ -272,10 +272,10 @@ void parseFilterList(
 			// [a::] => [a:0:]
 			if (slice_count > tok->data.d_list.count) {
 				if (slice_count == 1) {
-					tok->data.d_list.indexes[tok->data.d_list.count-1] = INT_MAX;
+					tok->data.d_list.indexes[tok->data.d_list.count] = INT_MAX;
 				}
 				else if (slice_count == 2) {
-					tok->data.d_list.indexes[tok->data.d_list.count-1] = INT_MAX;
+					tok->data.d_list.indexes[tok->data.d_list.count] = INT_MAX;
 				}
 				tok->data.d_list.count++;
 			}

@@ -248,49 +248,67 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
 
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value)
 {
-    printf("EXEC SLICE");
-    // TODO assert tok->type= ST_INDEX_SLICE
+    zval* data;
 
-    if (Z_TYPE_P(arr) != IS_ARRAY) {
+    int data_length = zend_hash_num_elements(HASH_OF(arr));
+
+    int range_start = tok->data.d_list.indexes[0];
+    int range_end = tok->data.d_list.count > 1 ? tok->data.d_list.indexes[1] : INT_MAX;
+    int range_step = tok->data.d_list.count > 2 ? tok->data.d_list.indexes[2] : 1;
+
+    // Zero-steps are not allowed, abort
+    if (range_step == 0) {
         return;
     }
 
-    int range_start = 0;
-    int range_end = 0;
-    int range_step = 1;
+    // Replace placeholder with actual value
+    if (range_start == INT_MAX) {
+        range_start = range_step > 0 ? 0 : data_length - 1;
+    }
+    // Indexing from the end of the list
+    else if (range_start < 0) {
+        range_start = data_length - abs(range_start);
+    }
 
-    // [a:]
-    if (tok->data.d_list.count == 1) {
-        range_start = tok->data.d_list.indexes[0];
+    // Replace placeholder with actual value
+    if (range_end == INT_MAX) {
+        range_end = range_step > 0 ? data_length : -1;
     }
-    // [a:b], [a:b:]
-    else if (tok->data.d_list.count == 2) {
-        range_start = tok->data.d_list.indexes[0];
-        range_end = tok->data.d_list.indexes[1];
+    // Indexing from the end of the list
+    else if (range_end < 0) {
+        range_end = data_length - abs(range_end);
     }
-    // [a:b:c]
-    else if (tok->data.d_list.count == 3) {
-        range_start = tok->data.d_list.indexes[0];
-        range_end = tok->data.d_list.indexes[1];
-        if (tok->data.d_list.indexes[2] != 0) {
-            range_step = tok->data.d_list.indexes[2];
+
+    // Set suitable boundaries for start index
+    range_start = range_start < -1 ? -1 : range_start;
+    range_start = range_start > data_length ? data_length : range_start;
+
+    // Set suitable boundaries for end index
+    range_end = range_end < -1 ? -1 : range_end;
+    range_end = range_end > data_length ? data_length : range_end;
+
+    if (range_step > 0) {
+        // Make sure that the range is sane so we don't end up in an infinite loop
+        if (range_start >= range_end) {
+            return;
+        }
+
+        for (int i = range_start; i < range_end; i += range_step) {
+            if ((data = zend_hash_index_find(HASH_OF(arr), i)) != NULL) {
+                copyToReturnResult(data, return_value);
+            }
         }
     }
+    else {
+        // Make sure that the range is sane so we don't end up in an infinite loop
+        if (range_start <= range_end) {
+            return;
+        }
 
-    if (range_start < 0) {
-        range_start = zend_hash_num_elements(HASH_OF(arr)) - abs(range_start);
-    }
-
-    if (range_end <= 0) {
-        range_end = zend_hash_num_elements(HASH_OF(arr)) - abs(range_end);
-    }
-
-    // printf("start: %d end: %d step: %d\n", tok->data.d_list.indexes[0], tok->data.d_list.indexes[1], tok->data.d_list.indexes[2]);
-    zval* data;
-
-    for (int i = range_start; i < range_end; i += range_step) {
-        if ((data = zend_hash_index_find(HASH_OF(arr), i)) != NULL) {
-            copyToReturnResult(data, return_value);
+        for (int i = range_start; i > range_end; i += range_step) {
+            if ((data = zend_hash_index_find(HASH_OF(arr), i)) != NULL) {
+                copyToReturnResult(data, return_value);
+            }
         }
     }
 }
