@@ -11,7 +11,7 @@ int get_operator_precedence(expr_op_type type);
 // Return node count (not including last token)
 
 struct ast_node* ast_alloc_node(enum ast_type type, const char* type_s) {
-	printf("Allocating %s\n", type_s);
+	// printf("Allocating %s\n", type_s);
     struct ast_node* ptr = emalloc(sizeof(struct ast_node));
 	ptr->next = NULL;
 	ptr->type = type;
@@ -194,7 +194,6 @@ bool build_parse_tree(
 
 	for (int i = *start; i < lex_tok_count; i++) {
 
-		printf("Looper...\n");
 		switch (lex_tok[i]) {
 		case LEX_WILD_CARD:
 			// todo : create a macro here

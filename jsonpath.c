@@ -77,7 +77,7 @@ PHP_METHOD(JsonPath, find)
 
     struct ast_node* next = head.next;
 
-    printf("Evaluating...\n");
+    // printf("Evaluating...\n");
     evaluateAST(search_target, next, return_value);
 
     // /* free the memory allocated for filter expressions */
@@ -143,7 +143,7 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
 {
     while (tok != NULL) {
-        printf("evaluateAST: %s", tok->type_s);
+        // printf("evaluateAST: %s\n", tok->type_s);
         switch (tok->type) {
         case AST_FILTER:
             evaluateAST(arr, tok->data.d_filter.children, return_value);
@@ -158,13 +158,8 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
             return;
         case AST_SELECTOR:
             execSelectorChain(arr, tok, return_value, 0);
-            // still needed?
-            while (tok != NULL && tok->type == AST_SELECTOR) {
-                tok = tok->next;
-            }
-            break;
+            return;
         case AST_WILD_CARD:
-            tok = tok->next;
             execWildcard(arr, tok, return_value);
             return;
         }
