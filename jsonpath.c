@@ -20,6 +20,7 @@
 static int le_jsonpath;
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count);
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
+void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value);
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
 void resolvePropertySelectorValue(zval* arr, expr_operator* node);
@@ -144,10 +145,13 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
 {
     while (tok != NULL) {
-        // printf("evaluateAST: %s\n", tok->type_s);
         switch (tok->type) {
         case AST_FILTER:
             evaluateAST(arr, tok->data.d_filter.children, return_value);
+            tok = tok->next;
+            break;
+        case AST_INDEX_LIST:
+            executeIndexFilter(arr, tok, return_value);
             tok = tok->next;
             break;
         case AST_INDEX_SLICE:
@@ -244,6 +248,20 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
         execRecursiveArrayWalk(data, tok, return_value, xy+1);
     }
     ZEND_HASH_FOREACH_END();
+}
+
+void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value)
+{
+    zval* data;
+
+    for (int i = 0; i < tok->data.d_list.count; i++) {
+        if (tok->data.d_list.indexes[i] < 0) {
+            tok->data.d_list.indexes[i] = zend_hash_num_elements(HASH_OF(arr)) - abs(tok->data.d_list.indexes[i]);
+        }
+        if ((data = zend_hash_index_find(HASH_OF(arr), tok->data.d_list.indexes[i])) != NULL) {
+            copyToReturnResult(data, return_value);
+        }
+    }
 }
 
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value)
