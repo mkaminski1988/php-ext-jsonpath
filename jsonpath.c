@@ -248,6 +248,7 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
 
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value)
 {
+    printf("EXEC SLICE");
     // TODO assert tok->type= ST_INDEX_SLICE
 
     if (Z_TYPE_P(arr) != IS_ARRAY) {

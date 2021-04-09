@@ -250,6 +250,8 @@ void parseFilterList(
 
 	// printf("parseList: enter!\n");
 
+	int slice_count = 0;
+
 	for (int i = *start; i < lex_tok_count; i++) {
 		if (lex_tok[i] == LEX_EXPR_END) {
 			// printf("parseList: reached end of expression\n");
@@ -264,6 +266,19 @@ void parseFilterList(
 			// printf("parseList: got a :\n");
 			tok->type = AST_INDEX_SLICE;
 			tok->type_s = "AST_INDEX_SLICE";
+
+			slice_count++;
+			// [:a] => [0:a]
+			// [a::] => [a:0:]
+			if (slice_count > tok->data.d_list.count) {
+				if (slice_count == 1) {
+					tok->data.d_list.indexes[tok->data.d_list.count-1] = INT_MAX;
+				}
+				else if (slice_count == 2) {
+					tok->data.d_list.indexes[tok->data.d_list.count-1] = INT_MAX;
+				}
+				tok->data.d_list.count++;
+			}
 		}
 		else if (lex_tok[i] == LEX_LITERAL) {
 			// printf("parseList: got a literal %s\n", lex_tok_values[i]);
