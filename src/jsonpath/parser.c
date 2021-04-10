@@ -184,7 +184,7 @@ static bool tokenize_expression(
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
-	int* start,
+	int* lex_idx,
 	int lex_tok_count,
 	struct ast_node* head,
 	parse_error* err
@@ -192,9 +192,9 @@ bool build_parse_tree(
 
 	struct ast_node* cur = head;
 
-	for (int i = *start; i < lex_tok_count; i++) {
+	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
 
-		switch (lex_tok[i]) {
+		switch (lex_tok[*lex_idx]) {
 		case LEX_WILD_CARD:
 			// todo : create a macro here
 			cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
@@ -206,28 +206,28 @@ bool build_parse_tree(
 			cur = cur->next;
 			break;
 		case LEX_DEEP_SCAN:
-			// printf("Parsing LEX_DEEP_SCAN...%s\n", lex_tok_values[i]);
+			// printf("Parsing LEX_DEEP_SCAN...%s\n", lex_tok_values[*lex_idx]);
 			cur->next = ast_alloc_node(AST_RECURSE, "AST_RECURSE");
 			cur = cur->next;
 			break;
 		case LEX_NODE:
-			// printf("Parsing LEX_NODE...%s\n", lex_tok_values[i]);
+			// printf("Parsing LEX_NODE...%s\n", lex_tok_values[*lex_idx]);
 			cur->next = ast_alloc_node(AST_SELECTOR, "AST_SELECTOR");
 			cur = cur->next;
-			strcpy(cur->data.d_selector.value, lex_tok_values[i]);
+			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
 			break;
 		case LEX_FILTER_START:
 			cur->next = ast_alloc_node(AST_FILTER, "AST_FILTER");
 			cur = cur->next;
 
-			i++;
+			(*lex_idx)++;
 
-			if (lex_tok[i] == LEX_LITERAL || lex_tok[i] == LEX_SLICE) {
+			if (lex_tok[*lex_idx] == LEX_LITERAL || lex_tok[*lex_idx] == LEX_SLICE) {
 				cur->data.d_filter.children = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
-				parseFilterList(lex_tok, lex_tok_values, &i, lex_tok_count, cur->data.d_filter.children);
+				parseFilterList(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_filter.children);
 			} else {
 				cur->data.d_filter.children = ast_alloc_node(AST_ROOT, "AST_ROOT");
-				return build_parse_tree(lex_tok, lex_tok_values, &i, lex_tok_count, cur->data.d_filter.children, err);
+				return build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_filter.children, err);
 			}
 			break;
 		case LEX_EXPR_END:
@@ -243,7 +243,7 @@ bool build_parse_tree(
 void parseFilterList(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
-	int* start,
+	int* lex_idx,
 	int lex_tok_count,
 	struct ast_node* tok
 ) {
@@ -252,17 +252,17 @@ void parseFilterList(
 
 	int slice_count = 0;
 
-	for (int i = *start; i < lex_tok_count; i++) {
-		if (lex_tok[i] == LEX_EXPR_END) {
+	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
+		if (lex_tok[*lex_idx] == LEX_EXPR_END) {
 			// printf("parseList: reached end of expression\n");
 			return;
 		}
-		else if (lex_tok[i] == LEX_CHILD_SEP) {
+		else if (lex_tok[*lex_idx] == LEX_CHILD_SEP) {
 			// printf("parseList: got a ,\n");
 			tok->type = AST_INDEX_LIST;
 			tok->type_s = "AST_INDEX_LIST";
 		}
-		else if (lex_tok[i] == LEX_SLICE) {
+		else if (lex_tok[*lex_idx] == LEX_SLICE) {
 			// printf("parseList: got a :\n");
 			tok->type = AST_INDEX_SLICE;
 			tok->type_s = "AST_INDEX_SLICE";
@@ -280,9 +280,9 @@ void parseFilterList(
 				tok->data.d_list.count++;
 			}
 		}
-		else if (lex_tok[i] == LEX_LITERAL) {
-			// printf("parseList: got a literal %s\n", lex_tok_values[i]);
-			tok->data.d_list.indexes[tok->data.d_list.count] = atoi(lex_tok_values[i]);
+		else if (lex_tok[*lex_idx] == LEX_LITERAL) {
+			// printf("parseList: got a literal %s\n", lex_tok_values[*lex_idx]);
+			tok->data.d_list.indexes[tok->data.d_list.count] = atoi(lex_tok_values[*lex_idx]);
 			tok->data.d_list.count++;
 		}
 	}
