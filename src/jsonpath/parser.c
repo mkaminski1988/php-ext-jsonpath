@@ -196,43 +196,48 @@ bool build_parse_tree(
 
 		switch (lex_tok[*lex_idx]) {
 		case LEX_WILD_CARD:
+			// printf("build_parse_tree: LEX_WILD_CARD\n");
 			// todo : create a macro here
 			cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
 			cur = cur->next;
 			break;
 		case ROOT:
+			// printf("build_parse_tree: ROOT\n");
 			// printf("Parsing ROOT...\n");
 			cur->next = ast_alloc_node(AST_ROOT, "AST_ROOT");
 			cur = cur->next;
 			break;
 		case LEX_DEEP_SCAN:
+			// printf("build_parse_tree: LEX_DEEP_SCAN\n");
 			// printf("Parsing LEX_DEEP_SCAN...%s\n", lex_tok_values[*lex_idx]);
 			cur->next = ast_alloc_node(AST_RECURSE, "AST_RECURSE");
 			cur = cur->next;
 			break;
 		case LEX_NODE:
+			// printf("build_parse_tree: LEX_NODE\n");
 			// printf("Parsing LEX_NODE...%s\n", lex_tok_values[*lex_idx]);
 			cur->next = ast_alloc_node(AST_SELECTOR, "AST_SELECTOR");
 			cur = cur->next;
 			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
 			break;
 		case LEX_FILTER_START:
+			// printf("build_parse_tree: LEX_FILTER_START\n");
 			cur->next = ast_alloc_node(AST_FILTER, "AST_FILTER");
 			cur = cur->next;
 
-			(*lex_idx)++;
-
-			if (lex_tok[*lex_idx] == LEX_LITERAL || lex_tok[*lex_idx] == LEX_SLICE) {
+			if (lex_tok[(*lex_idx)+1] == LEX_LITERAL || lex_tok[(*lex_idx)+1] == LEX_SLICE) {
+				(*lex_idx)++;
 				cur->next = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
 				cur = cur->next;
 				parseFilterList(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
-			} else {
-				return build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur, err);
 			}
 			break;
 		case LEX_EXPR_END:
-			return true;
+			// printf("build_parse_tree: LEX_EXPR_END ");
+			// printf("%s\n", visible[lex_tok[(*lex_idx)+1]]);
+			break;
 		default:
+			// printf("build_parse_tree: default\n");
 			break;
 		}
 	}

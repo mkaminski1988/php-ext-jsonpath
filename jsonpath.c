@@ -145,6 +145,9 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
 {
     while (tok != NULL) {
+
+        // printf("evaluateAST Type: %s\n", tok->type_s);
+
         switch (tok->type) {
         case AST_FILTER:
             // noop?
@@ -219,7 +222,7 @@ void execWildcard(zval* arr, struct ast_node* tok, zval* return_value)
         if (tok->next == NULL) {
             copyToReturnResult(data, return_value);
         }
-        else if (Z_TYPE_P(data) == IS_ARRAY) {
+        else {
             evaluateAST(data, tok->next, return_value);
         }
     }
@@ -259,7 +262,12 @@ void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value)
             tok->data.d_list.indexes[i] = zend_hash_num_elements(HASH_OF(arr)) - abs(tok->data.d_list.indexes[i]);
         }
         if ((data = zend_hash_index_find(HASH_OF(arr), tok->data.d_list.indexes[i])) != NULL) {
-            copyToReturnResult(data, return_value);
+            if (tok->next == NULL) {
+                copyToReturnResult(data, return_value);
+            }
+            else {
+                evaluateAST(data, tok->next, return_value);
+            }
         }
     }
 }
@@ -313,7 +321,12 @@ void executeSlice(zval* arr, struct ast_node* tok, zval* return_value)
 
         for (int i = range_start; i < range_end; i += range_step) {
             if ((data = zend_hash_index_find(HASH_OF(arr), i)) != NULL) {
-                copyToReturnResult(data, return_value);
+                if (tok->next == NULL) {
+                    copyToReturnResult(data, return_value);
+                }
+                else {
+                    evaluateAST(data, tok->next, return_value);
+                }
             }
         }
     }
@@ -325,7 +338,12 @@ void executeSlice(zval* arr, struct ast_node* tok, zval* return_value)
 
         for (int i = range_start; i > range_end; i += range_step) {
             if ((data = zend_hash_index_find(HASH_OF(arr), i)) != NULL) {
-                copyToReturnResult(data, return_value);
+                if (tok->next == NULL) {
+                    copyToReturnResult(data, return_value);
+                }
+                else {
+                    evaluateAST(data, tok->next, return_value);
+                }
             }
         }
     }
