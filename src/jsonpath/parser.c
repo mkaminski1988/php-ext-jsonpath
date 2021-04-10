@@ -223,11 +223,11 @@ bool build_parse_tree(
 			(*lex_idx)++;
 
 			if (lex_tok[*lex_idx] == LEX_LITERAL || lex_tok[*lex_idx] == LEX_SLICE) {
-				cur->data.d_filter.children = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
-				parseFilterList(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_filter.children);
+				cur->next = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
+				cur = cur->next;
+				parseFilterList(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
 			} else {
-				cur->data.d_filter.children = ast_alloc_node(AST_ROOT, "AST_ROOT");
-				return build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_filter.children, err);
+				return build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur, err);
 			}
 			break;
 		case LEX_EXPR_END:

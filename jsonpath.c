@@ -147,7 +147,7 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
     while (tok != NULL) {
         switch (tok->type) {
         case AST_FILTER:
-            evaluateAST(arr, tok->data.d_filter.children, return_value);
+            // noop?
             tok = tok->next;
             break;
         case AST_INDEX_LIST:

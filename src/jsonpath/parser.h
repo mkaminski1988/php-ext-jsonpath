@@ -25,9 +25,6 @@ enum ast_type {
 
 union ast_node_data {
     struct {
-        struct ast_node* children;
-    } d_filter;
-    struct {
         int count;
         union ast_node_data* names[3];
         int indexes[3];
