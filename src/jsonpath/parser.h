@@ -4,13 +4,15 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <Zend/zend_smart_str.h>
+#include <Zend/zend_smart_str.h> /* todo where is zval defined? */
 
-#define MAX_NODE_DEPTH 5
 #define PARSE_BUF_LEN 50
 
-
-/* AST stuff */
+typedef enum {
+    TYPE_OPERAND,
+    TYPE_OPERATOR,
+    TYPE_PAREN,
+} operator_type;
 
 enum ast_type {
     AST_AND,
@@ -18,7 +20,6 @@ enum ast_type {
     AST_EQ,
     AST_EXPR_END,
     AST_EXPR_START,
-    AST_FILTER,
     AST_GT,
     AST_GTE,
     AST_INDEX_LIST,
@@ -50,6 +51,7 @@ union ast_node_data {
     } d_selector;
     struct {
         char value[PARSE_BUF_LEN];
+        bool value_bool;
     } d_literal;
     struct {
         struct ast_node* node;
@@ -63,61 +65,37 @@ struct ast_node {
     union ast_node_data data;
 };
 
-/* AST stuff */
-
-typedef struct {
-    expr_op_type type;
-    char value[PARSE_BUF_LEN];
-    bool value_bool;
-    char* label[MAX_NODE_DEPTH];
-    int label_count;
-} expr_operator;
-
-typedef struct {
-    operator_type type;
-    char* node_value;
-    int node_value_len;
-    filter_type filter_type;
-    int index_count;
-    int indexes[PARSE_BUF_LEN];
-    expr_operator* expressions;
-    int expression_count;
-} operator;
-
 typedef struct {
     char msg[PARSE_BUF_LEN];
 } parse_error;
 
-bool tokenize(char** input, operator * tok);
+typedef bool(*compare_cb) (struct ast_node*, struct ast_node*);
 
-typedef bool(*compare_cb) (expr_operator*, expr_operator*);
+bool evaluate_postfix_expression(zval* arr, struct ast_node* tok);
+compare_cb exec_cb_by_token(enum ast_type);
+operator_type get_token_type(struct ast_node*);
 
-void convert_to_postfix(expr_operator* expr_in, int in_count, expr_operator* expr_out, int* out_count);
-bool evaluate_postfix_expression(expr_operator* expr, int count);
-compare_cb exec_cb_by_token(expr_op_type);
-operator_type get_token_type(expr_op_type);
-
-bool compare_lt(expr_operator* lh, expr_operator* rh);
-bool compare_lte(expr_operator* lh, expr_operator* rh);
-bool compare_gt(expr_operator* lh, expr_operator* rh);
-bool compare_gte(expr_operator* lh, expr_operator* rh);
-bool compare_and(expr_operator* lh, expr_operator* rh);
-bool compare_or(expr_operator* lh, expr_operator* rh);
-bool compare_eq(expr_operator* lh, expr_operator* rh);
-bool compare_neq(expr_operator* lh, expr_operator* rh);
-bool compare_isset(expr_operator* lh, expr_operator* rh);	// lh = rh
-bool compare_rgxp(expr_operator* lh, expr_operator* rh);
+bool compare_lt(struct ast_node* lh, struct ast_node* rh);
+bool compare_lte(struct ast_node* lh, struct ast_node* rh);
+bool compare_gt(struct ast_node* lh, struct ast_node* rh);
+bool compare_gte(struct ast_node* lh, struct ast_node* rh);
+bool compare_and(struct ast_node* lh, struct ast_node* rh);
+bool compare_or(struct ast_node* lh, struct ast_node* rh);
+bool compare_eq(struct ast_node* lh, struct ast_node* rh);
+bool compare_neq(struct ast_node* lh, struct ast_node* rh);
+bool compare_isset(struct ast_node* lh, struct ast_node* rh);	// lh = rh
+bool compare_rgxp(struct ast_node* lh, struct ast_node* rh);
 
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
-	int* start,
+	int* lex_idx,
 	int lex_tok_count,
 	struct ast_node* head,
 	parse_error* err
 );
 
-void parseFilterList(
+void parse_filter_list(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
 	int* start,

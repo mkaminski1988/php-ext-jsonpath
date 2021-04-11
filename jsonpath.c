@@ -23,8 +23,8 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
 void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value);
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
-void resolvePropertySelectorValue(zval* arr, expr_operator* node);
-void resolveIssetSelector(zval* arr, expr_operator* node);
+void resolvePropertySelectorValue(zval* arr, struct ast_node* node);
+void resolveIssetSelector(zval* arr, struct ast_node* node);
 struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void execWildcard(zval* arr, struct ast_node* tok, zval* return_value);
 bool is_scalar(zval* arg);
@@ -62,11 +62,8 @@ PHP_METHOD(JsonPath, find)
 
     /* assemble an array of query execution instructions from parsed tokens */
 
-    operator tok[PARSE_BUF_LEN];
     parse_error p_err;
-
     struct ast_node head;
-
     int i = 0;
 
     if (!build_parse_tree(lex_tok, lex_tok_literals, &i, lex_tok_count, &head, &p_err)) {
@@ -132,7 +129,7 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
             tok_literals[i][0] = '\0';
             break;
         }
-
+        
         tok[i] = cur_tok;
         i++;
     }
@@ -149,10 +146,6 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
         // printf("evaluateAST Type: %s\n", tok->type_s);
 
         switch (tok->type) {
-        case AST_FILTER:
-            // noop?
-            tok = tok->next;
-            break;
         case AST_INDEX_LIST:
             executeIndexFilter(arr, tok, return_value);
             tok = tok->next;
@@ -174,6 +167,13 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
         case AST_WILD_CARD:
             execWildcard(arr, tok, return_value);
             return;
+        case AST_EXPR_START:
+            tok = tok->next;
+            break;
+        case AST_EXPR_END:
+            tok = tok->next;
+            // noop
+            break;
         }
     }
 }
@@ -355,25 +355,25 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
     zend_string* key;
     zval* data;
 
-    struct ast_node* ptr
+    struct ast_node* ptr;
 
     ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
 
-        ptr = tok->d_expression.node;
+        ptr = tok;
 
         // For each array entry, find the node names and populate their values
         // Fill up expression NODE_NAME VALS
         while (ptr != NULL) {
-            if (ptr->next != NULL && ptr->next.type == AST_ISSET) {
+            if (ptr->next != NULL && ptr->next->type == AST_ISSET) {
                 resolveIssetSelector(data, ptr);
             }
             else if (ptr->type == AST_SELECTOR) {
                 resolvePropertySelectorValue(data, ptr);
             }
-            ptr = ptr-next;
+            ptr = ptr->next;
         }
 
-        if (evaluate_postfix_expression(tok->d_expression.node)) {
+        if (evaluate_postfix_expression(data, tok->next)) {
             if (tok->next == NULL) {
                 copyToReturnResult(data, return_value);
             }
@@ -382,14 +382,14 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
             }
         }
 
-        ptr = tok->d_expression.node;
+        ptr = tok;
 
         // Clean up node values to prevent incorrect node values during recursive wildcard iterations
         while (ptr != NULL) {
             if (ptr->type == AST_SELECTOR) {
-                ptr->d_selector.value[0] = '\0';
+                ptr->data.d_selector.value[0] = '\0';
             }
-            ptr = ptr-next;
+            ptr = ptr->next;
         }
     }
     ZEND_HASH_FOREACH_END();
@@ -398,85 +398,85 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
 /* populate the expression operator with the array value that */
 /* corresponds to the JSON-path object selector. */
 /* e.g. $.path.to.val -> $[path][to][val] */
-void resolvePropertySelectorValue(zval* arr, expr_operator* node)
+void resolvePropertySelectorValue(zval* arr, struct ast_node* node)
 {
-    if (Z_TYPE_P(arr) != IS_ARRAY) {
-        return;
-    }
+    // if (Z_TYPE_P(arr) != IS_ARRAY) {
+    //     return;
+    // }
 
-    zval* data;
+    // zval* data;
 
-    for (int i = 0; i < node->label_count; i++) {
-        if ((data = zend_hash_str_find(HASH_OF(arr), node->label[i], strlen(node->label[i]))) == NULL) {
-            return;
-        }
-        arr = data;
-    }
+    // while (node->type == AST_SELECTOR) {
+    //     if ((data = zend_hash_str_find(HASH_OF(arr), node->data.d_selector.value, strlen(node->label[i]))) == NULL) {
+    //         return;
+    //     }
+    //     arr = data;
+    // }
 
-    /* we can't compare strings/numbers to non-scalar values in JSON-path */
-    if (!is_scalar(data)) {
-        return;
-    }
+    // /* we can't compare strings/numbers to non-scalar values in JSON-path */
+    // if (!is_scalar(data)) {
+    //     return;
+    // }
 
-    if (Z_TYPE_P(data) == IS_TRUE) {
-        strncpy(node->value, "JP_LITERAL_TRUE", 15);
-        node->value[15] = '\0';
-    }
-    else if (Z_TYPE_P(data) == IS_FALSE) {
-        strncpy(node->value, "JP_LITERAL_FALSE", 16);
-        node->value[16] = '\0';
-    }
-    else if (Z_TYPE_P(data) != IS_STRING) {
+    // if (Z_TYPE_P(data) == IS_TRUE) {
+    //     strncpy(node->value, "JP_LITERAL_TRUE", 15);
+    //     node->value[15] = '\0';
+    // }
+    // else if (Z_TYPE_P(data) == IS_FALSE) {
+    //     strncpy(node->value, "JP_LITERAL_FALSE", 16);
+    //     node->value[16] = '\0';
+    // }
+    // else if (Z_TYPE_P(data) != IS_STRING) {
 
-        zval zcopy;
+    //     zval zcopy;
 
-        int free_zcopy = zend_make_printable_zval(data, &zcopy);
-        if (free_zcopy) {
-            data = &zcopy;
-        }
+    //     int free_zcopy = zend_make_printable_zval(data, &zcopy);
+    //     if (free_zcopy) {
+    //         data = &zcopy;
+    //     }
 
-        size_t s_len = Z_STRLEN_P(data);
-        char* s = Z_STRVAL_P(data);
+    //     size_t s_len = Z_STRLEN_P(data);
+    //     char* s = Z_STRVAL_P(data);
 
-        strncpy(node->value, s, s_len);
-        node->value[s_len] = '\0';
+    //     strncpy(node->value, s, s_len);
+    //     node->value[s_len] = '\0';
 
-        if (free_zcopy) {
-            zval_dtor(&zcopy);
-        }
-    }
-    else {
-        size_t s_len = Z_STRLEN_P(data);
-        char* s = Z_STRVAL_P(data);
-        strncpy(node->value, s, s_len);
-        node->value[s_len] = '\0';
-    }
+    //     if (free_zcopy) {
+    //         zval_dtor(&zcopy);
+    //     }
+    // }
+    // else {
+    //     size_t s_len = Z_STRLEN_P(data);
+    //     char* s = Z_STRVAL_P(data);
+    //     strncpy(node->value, s, s_len);
+    //     node->value[s_len] = '\0';
+    // }
 }
 
 /* assign the isset() operator a boolean value based on whether there is an */
 /* array key for the corresponding JSON-path object selector. */
-void resolveIssetSelector(zval* arr, expr_operator* node)
+void resolveIssetSelector(zval* arr, struct ast_node* node)
 {
-    zval* data;
+    // zval* data;
 
-    for (int i = 0; i < node->label_count; i++) {
-        if ((data = zend_hash_str_find(HASH_OF(arr), node->label[i], strlen(node->label[i]))) == NULL) {
-            node->value_bool = false;
-            break;
-        }
-        else {
-            node->value_bool = true;
-            arr = data;
-        }
-    }
+    // for (int i = 0; i < node->label_count; i++) {
+    //     if ((data = zend_hash_str_find(HASH_OF(arr), node->label[i], strlen(node->label[i]))) == NULL) {
+    //         node->value_bool = false;
+    //         break;
+    //     }
+    //     else {
+    //         node->value_bool = true;
+    //         arr = data;
+    //     }
+    // }
 }
 
-bool compare_lt(expr_operator* lh, expr_operator* rh)
+bool compare_lt(struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
-    ZVAL_STRING(&a, (*lh).value);
-    ZVAL_STRING(&b, (*rh).value);
+    ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    ZVAL_STRING(&b, (*rh).data.d_literal.value);
 
     compare_function(&result, &a, &b);
     zval_ptr_dtor(&a);
@@ -487,12 +487,12 @@ bool compare_lt(expr_operator* lh, expr_operator* rh)
     return res;
 }
 
-bool compare_gt(expr_operator* lh, expr_operator* rh)
+bool compare_gt(struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
-    ZVAL_STRING(&a, (*lh).value);
-    ZVAL_STRING(&b, (*rh).value);
+    ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    ZVAL_STRING(&b, (*rh).data.d_literal.value);
 
     compare_function(&result, &a, &b);
     zval_ptr_dtor(&a);
@@ -503,12 +503,12 @@ bool compare_gt(expr_operator* lh, expr_operator* rh)
     return res;
 }
 
-bool compare_lte(expr_operator* lh, expr_operator* rh)
+bool compare_lte(struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
-    ZVAL_STRING(&a, (*lh).value);
-    ZVAL_STRING(&b, (*rh).value);
+    ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    ZVAL_STRING(&b, (*rh).data.d_literal.value);
 
     compare_function(&result, &a, &b);
     zval_ptr_dtor(&a);
@@ -519,12 +519,12 @@ bool compare_lte(expr_operator* lh, expr_operator* rh)
     return res;
 }
 
-bool compare_gte(expr_operator* lh, expr_operator* rh)
+bool compare_gte(struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
-    ZVAL_STRING(&a, (*lh).value);
-    ZVAL_STRING(&b, (*rh).value);
+    ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    ZVAL_STRING(&b, (*rh).data.d_literal.value);
 
     compare_function(&result, &a, &b);
     zval_ptr_dtor(&a);
@@ -535,22 +535,22 @@ bool compare_gte(expr_operator* lh, expr_operator* rh)
     return res;
 }
 
-bool compare_and(expr_operator* lh, expr_operator* rh)
+bool compare_and(struct ast_node* lh, struct ast_node* rh)
 {
-    return (*lh).value_bool && (*rh).value_bool;
+    return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
 }
 
-bool compare_or(expr_operator* lh, expr_operator* rh)
+bool compare_or(struct ast_node* lh, struct ast_node* rh)
 {
-    return (*lh).value_bool || (*rh).value_bool;
+    return (*lh).data.d_literal.value_bool || (*rh).data.d_literal.value_bool;
 }
 
-bool compare_eq(expr_operator* lh, expr_operator* rh)
+bool compare_eq(struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
-    ZVAL_STRING(&a, (*lh).value);
-    ZVAL_STRING(&b, (*rh).value);
+    ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    ZVAL_STRING(&b, (*rh).data.d_literal.value);
 
     compare_function(&result, &a, &b);
     zval_ptr_dtor(&a);
@@ -561,12 +561,12 @@ bool compare_eq(expr_operator* lh, expr_operator* rh)
     return res;
 }
 
-bool compare_neq(expr_operator* lh, expr_operator* rh)
+bool compare_neq(struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
-    ZVAL_STRING(&a, (*lh).value);
-    ZVAL_STRING(&b, (*rh).value);
+    ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    ZVAL_STRING(&b, (*rh).data.d_literal.value);
 
     compare_function(&result, &a, &b);
     zval_ptr_dtor(&a);
@@ -577,17 +577,17 @@ bool compare_neq(expr_operator* lh, expr_operator* rh)
     return res;
 }
 
-bool compare_isset(expr_operator* lh, expr_operator* rh)
+bool compare_isset(struct ast_node* lh, struct ast_node* rh)
 {
-    return (*lh).value_bool && (*rh).value_bool;
+    return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
 }
 
-bool compare_rgxp(expr_operator* lh, expr_operator* rh)
+bool compare_rgxp(struct ast_node* lh, struct ast_node* rh)
 {
     zval pattern;
     pcre_cache_entry* pce;
 
-    ZVAL_STRING(&pattern, (*rh).value);
+    ZVAL_STRING(&pattern, (*rh).data.d_literal.value);
 
     if ((pce = pcre_get_compiled_regex_cache(Z_STR(pattern))) == NULL) {
         zval_ptr_dtor(&pattern);
@@ -600,7 +600,7 @@ bool compare_rgxp(expr_operator* lh, expr_operator* rh)
     ZVAL_NULL(&retval);
     ZVAL_NULL(&subpats);
 
-    zend_string* s_lh = zend_string_init((*lh).value, strlen((*lh).value), 0);
+    zend_string* s_lh = zend_string_init((*lh).data.d_literal.value, strlen((*lh).data.d_literal.value), 0);
 
     php_pcre_match_impl(pce, s_lh, &retval, &subpats, 0, 0, 0, 0);
 

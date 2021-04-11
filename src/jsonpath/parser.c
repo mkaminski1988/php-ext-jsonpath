@@ -17,32 +17,32 @@ struct ast_node* ast_alloc_node(enum ast_type type, const char* type_s) {
 	return ptr;
 }
 
-void push_operator(stack* s, struct ast_node* cur) {
+struct ast_node* push_operator(stack* s, struct ast_node* cur) {
 
-	if (!s.size || (*stack_top(&s)).type == AST_PAREN_LEFT) {
-		stack_push(&s, &expr_in[i]);
-		return NULL;
-	}
-
-	struct ast_node* expr_tmp = stack_top(&s);
-
-	//TODO compare macro or assign to var?
-	if (get_operator_precedence(cur->type) > get_operator_precedence(expr_tmp->type)) {
+	if (!s->size || (*stack_top(s)).type == AST_PAREN_LEFT) {
 		stack_push(s, cur);
 		return NULL;
 	}
 
-	if (get_operator_precedence(cur->type) < get_operator_precedence(expr_tmp->type)) {
-		expr_tmp = stack_top(s);
+	struct ast_node* tmp = stack_top(s);
+
+	//TODO compare macro or assign to var?
+	if (get_operator_precedence(cur->type) > get_operator_precedence(tmp->type)) {
+		stack_push(s, cur);
+		return NULL;
+	}
+
+	if (get_operator_precedence(cur->type) < get_operator_precedence(tmp->type)) {
+		tmp = stack_top(s);
 		stack_pop(s);
 	}
 	else {
-		expr_tmp = stack_top(s);
+		tmp = stack_top(s);
 		stack_pop(s);
 		stack_push(s, cur);
 	}
 
-	return expr_tmp;
+	return tmp;
 }
 
 /* See http://csis.pace.edu/~wolf/CS122/infix-postfix.htm */
@@ -60,6 +60,8 @@ bool build_parse_tree(
 	stack s;
 	stack_init(&s);
 
+	int expr_start_count = 0;
+
 	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
 
 		switch (lex_tok[*lex_idx]) {
@@ -68,7 +70,7 @@ bool build_parse_tree(
 			cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
 			cur = cur->next;
 			break;
-		case ROOT:
+		case LEX_ROOT:
 			cur->next = ast_alloc_node(AST_ROOT, "AST_ROOT");
 			cur = cur->next;
 			break;
@@ -82,25 +84,24 @@ bool build_parse_tree(
 			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
 			break;
 		case LEX_FILTER_START:
-			cur->next = ast_alloc_node(AST_FILTER, "AST_FILTER");
-
 			if (lex_tok[(*lex_idx)+1] == LEX_LITERAL || lex_tok[(*lex_idx)+1] == LEX_SLICE) {
 				(*lex_idx)++;
 				cur->next = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
 				cur = cur->next;
-				parseFilterList(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
+				parse_filter_list(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
 			}
+			// else we should have a wildcard
 			break;
 		case LEX_EXPR_START:
 			cur->next = ast_alloc_node(AST_EXPR_START, "AST_EXPR_START");
 			cur = cur->next;
-			in_expression = true;
+			expr_start_count++;
 			break;
 		case LEX_PAREN_OPEN:
 			stack_push(&s, ast_alloc_node(AST_PAREN_LEFT, "AST_PAREN_LEFT"));
 			break;
 		case LEX_PAREN_CLOSE:
-			if (cur->type == AST_NODE_NAME) {
+			if (cur->type == AST_SELECTOR) {
 				cur->next = ast_alloc_node(AST_ISSET, "AST_ISSET");
 				cur = cur->next;
 			} else {
@@ -108,7 +109,7 @@ bool build_parse_tree(
 				while (s.size) {
 					tmp = stack_top(&s);
 					stack_pop(&s);
-					if (expr_tmp->type == AST_PAREN_LEFT) {
+					if (tmp->type == AST_PAREN_LEFT) {
 						break;
 					}
 					cur->next = tmp;
@@ -142,64 +143,64 @@ bool build_parse_tree(
 			}
 			break;
 		case LEX_LT:
-			tmp = push_operator(ast_alloc_node(AST_LT, "AST_LT"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_LT, "AST_LT"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
 		case LEX_LTE:
-			tmp = push_operator(ast_alloc_node(AST_LTE, "AST_LTE"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_LTE, "AST_LTE"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
 		case LEX_GT:
-			tmp = push_operator(ast_alloc_node(AST_GT, "AST_GT"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_GT, "AST_GT"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
-		case EXPR_GTE:
-			tmp = push_operator(ast_alloc_node(AST_GTE, "AST_GTE"));
-			if (!tmp != NULL) {
+		case LEX_GTE:
+			tmp = push_operator(&s, ast_alloc_node(AST_GTE, "AST_GTE"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
 		case LEX_NEQ:
-			tmp = push_operator(ast_alloc_node(AST_NE, "AST_NE"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_NE, "AST_NE"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
 		case LEX_EQ:
-			tmp = push_operator(ast_alloc_node(AST_EQ, "AST_EQ"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_EQ, "AST_EQ"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
 		case LEX_OR:
-			tmp = push_operator(ast_alloc_node(AST_OR, "AST_OR"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_OR, "AST_OR"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
 		case LEX_AND:
-			tmp = push_operator(ast_alloc_node(AST_AND, "AST_AND"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_AND, "AST_AND"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
 			break;
 		case LEX_RGXP:
-			tmp = push_operator(ast_alloc_node(AST_RGXP, "AST_RGXP"));
-			if (!tmp != NULL) {
+			tmp = push_operator(&s, ast_alloc_node(AST_RGXP, "AST_RGXP"));
+			if (tmp != NULL) {
 				cur->next = tmp;
 				cur = cur->next;
 			}
@@ -208,10 +209,14 @@ bool build_parse_tree(
 			cur->next = ast_alloc_node(AST_EXPR_END, "AST_EXPR_END");
 			cur = cur->next;
 
-			in_expression = false;
-
 			/* Remove remaining elements */
-			for (; s.size; expr_tmp = stack_top(&s), expr_out[(*out_count)++] = *expr_tmp, stack_pop(&s));
+			while (s.size > 0) {
+				cur->next = stack_top(&s);
+				cur = cur->next;
+				stack_pop(&s);
+			}
+
+			expr_start_count--;
 			break;
 		default:
 			// printf("build_parse_tree: default\n");
@@ -219,10 +224,16 @@ bool build_parse_tree(
 		}
 	}
 
+	if (expr_start_count != 0) {
+		/* we made it to the end without finding an expression terminator */
+		strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
+		return false;
+	}
+
 	return true;
 }
 
-void parseFilterList(
+void parse_filter_list(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
 	int* lex_idx,
@@ -260,13 +271,16 @@ void parseFilterList(
 			// printf("parseList: got a literal %s\n", lex_tok_values[*lex_idx]);
 			tok->data.d_list.indexes[tok->data.d_list.count] = atoi(lex_tok_values[*lex_idx]);
 			tok->data.d_list.count++;
+		} else {
+			// printf("parse_filter_list, got %s", visible[lex_tok[*lex_idx]]);
+			// return;
 		}
 	}
 }
 
-operator_type get_token_type(enum ast_type type)
+operator_type get_token_type(struct ast_node* tok)
 {
-	switch (type) {
+	switch (tok->type) {
 	case AST_EQ:
 	case AST_NE:
 	case AST_LT:
@@ -283,74 +297,77 @@ operator_type get_token_type(enum ast_type type)
 		return TYPE_PAREN;
 	case AST_LITERAL:
 	case AST_LITERAL_BOOL:
-	case AST_NODE_NAME:
 	case AST_BOOL:
+		/* make eval ast return strings? */
 		return TYPE_OPERAND;
 	}
 }
 
-bool evaluate_postfix_expression(struct ast_node* tok, int count)
+bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 {
-	stack s;
-	stack_init(&s);
-	expr_operator* expr_lh;
-	expr_operator* expr_rh;
+	return false;
+	// stack s;
+	// stack_init(&s);
+	// expr_operator* expr_lh;
+	// expr_operator* expr_rh;
 
-	/* Temporary operators that store intermediate evaluations */
-	expr_operator op_true;
+	// /* Temporary operators that store intermediate evaluations */
+	// expr_operator op_true;
 
-	op_true.type = AST_BOOL;
-	op_true.value_bool = true;
+	// op_true.type = AST_BOOL;
+	// op_true.value_bool = true;
 
-	expr_operator op_false;
+	// expr_operator op_false;
 
-	op_false.type = AST_BOOL;
-	op_false.value_bool = false;
+	// op_false.type = AST_BOOL;
+	// op_false.value_bool = false;
 
-	int i = 0;
+	// int i = 0;
 
-	while (i < count) {
+	// while (i < count) {
 
-		switch (get_token_type((*op).type)) {
-		case TYPE_OPERATOR:
+	// 	switch (get_token_type((*op).type)) {
+	// 	case TYPE_OPERATOR:
 
-			if (!is_unary((*op).type)) {
-				expr_rh = stack_top(&s);
-				stack_pop(&s);
-				expr_lh = stack_top(&s);
-			}
-			else {
-				expr_rh = stack_top(&s);
-				expr_lh = expr_rh;
-			}
 
-			stack_pop(&s);
+	// 		/* call evaluateAST */
+	// 		if (!is_unary((*op).type)) {
+	// 			expr_rh = stack_top(&s);
+	// 			stack_pop(&s);
+	// 			expr_lh = stack_top(&s);
+	// 		}
+	// 		else {
+	// 			expr_rh = stack_top(&s);
+	// 			expr_lh = expr_rh;
+	// 		}
 
-			if (exec_cb_by_token((*op).type) (expr_lh, expr_rh)) {
-				stack_push(&s, &op_true);
-			}
-			else {
-				stack_push(&s, &op_false);
-			}
+	// 		stack_pop(&s);
 
-			break;
-		case TYPE_OPERAND:
-			stack_push(&s, op);
-			break;
-		}
+	// 		if (exec_cb_by_token((*op).type) (expr_lh, expr_rh)) {
+	// 			stack_push(&s, &op_true);
+	// 		}
+	// 		else {
+	// 			stack_push(&s, &op_false);
+	// 		}
 
-		i++;
-		op++;
-	}
+	// 		break;
+	// 	case TYPE_OPERAND:
+	// 		stack_push(&s, op);
+	// 		break;
+	// 	}
 
-	expr_lh = stack_top(&s);
+	// 	i++;
+	// 	op++;
+	// }
 
-	return (*expr_lh).value_bool;
+	// expr_lh = stack_top(&s);
+
+	// return (*expr_lh).value_bool;
 }
 
-compare_cb exec_cb_by_token(enum ast_type)
+compare_cb exec_cb_by_token(enum ast_type type)
 {
-	switch (token_type) {
+	switch (type) {
 	case AST_EQ:
 		return compare_eq;
 	case AST_NE:
@@ -382,13 +399,13 @@ compare_cb exec_cb_by_token(enum ast_type)
 	}
 }
 
-bool is_unary(enum ast_type)
+bool is_unary(enum ast_type type)
 {
 	return type == AST_ISSET;
 }
 
 //TODO: Distinguish between operator and token?
-int get_operator_precedence(enum ast_type)
+int get_operator_precedence(enum ast_type type)
 {
 	switch (type) {
 	case AST_ISSET:

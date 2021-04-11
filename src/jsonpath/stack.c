@@ -1,35 +1,35 @@
 #include "stack.h"
 #include <stdio.h>
 
-void stack_init(stack * s)
+void stack_init(stack* s)
 {
     s->size = 0;
 }
 
-expr_operator *stack_top(stack * s)
+struct ast_node* stack_top(stack* s)
 {
     if (s->size == 0) {
-	printf("Stack is empty\n");
-	return NULL;
+	    printf("Stack is empty\n");
+	    return NULL;
     }
 
     return s->data[s->size - 1];
 }
 
-void stack_push(stack * s, expr_operator * expr)
+void stack_push(stack* s, struct ast_node* tok)
 {
     if (s->size < STACK_MAX) {
-	s->data[s->size++] = expr;
+	    s->data[s->size++] = tok;
     } else {
-	printf("Stack is empty\n");
+	    printf("Stack is empty\n");
     }
 }
 
-void stack_pop(stack * s)
+void stack_pop(stack* s)
 {
     if (s->size == 0) {
-	printf("Stack is empty\n");
+	    printf("Stack is empty\n");
     } else {
-	s->size--;
+	    s->size--;
     }
 }
