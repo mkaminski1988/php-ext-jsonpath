@@ -20,6 +20,7 @@
 static int le_jsonpath;
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count);
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
+void executeExpression(zval* arr, struct ast_node* tok, zval* return_value);
 void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value);
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
@@ -169,6 +170,7 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
             return;
         case AST_EXPR_START:
             tok = tok->next;
+            executeExpression(arr, tok, return_value);
             break;
         case AST_EXPR_END:
             tok = tok->next;
@@ -355,23 +357,23 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
     zend_string* key;
     zval* data;
 
-    struct ast_node* ptr;
+    // struct ast_node* ptr;
 
     ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
 
-        ptr = tok;
+        // ptr = tok;
 
-        // For each array entry, find the node names and populate their values
-        // Fill up expression NODE_NAME VALS
-        while (ptr != NULL) {
-            if (ptr->next != NULL && ptr->next->type == AST_ISSET) {
-                resolveIssetSelector(data, ptr);
-            }
-            else if (ptr->type == AST_SELECTOR) {
-                resolvePropertySelectorValue(data, ptr);
-            }
-            ptr = ptr->next;
-        }
+        // // For each array entry, find the node names and populate their values
+        // // Fill up expression NODE_NAME VALS
+        // while (ptr != NULL) {
+        //     if (ptr->next != NULL && ptr->next->type == AST_ISSET) {
+        //         resolveIssetSelector(data, ptr);
+        //     }
+        //     else if (ptr->type == AST_SELECTOR) {
+        //         resolvePropertySelectorValue(data, ptr);
+        //     }
+        //     ptr = ptr->next;
+        // }
 
         if (evaluate_postfix_expression(data, tok->next)) {
             if (tok->next == NULL) {
@@ -382,15 +384,15 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
             }
         }
 
-        ptr = tok;
+        // ptr = tok;
 
-        // Clean up node values to prevent incorrect node values during recursive wildcard iterations
-        while (ptr != NULL) {
-            if (ptr->type == AST_SELECTOR) {
-                ptr->data.d_selector.value[0] = '\0';
-            }
-            ptr = ptr->next;
-        }
+        // // Clean up node values to prevent incorrect node values during recursive wildcard iterations
+        // while (ptr != NULL) {
+        //     if (ptr->type == AST_SELECTOR) {
+        //         ptr->data.d_selector.value[0] = '\0';
+        //     }
+        //     ptr = ptr->next;
+        // }
     }
     ZEND_HASH_FOREACH_END();
 }

@@ -79,8 +79,15 @@ bool build_parse_tree(
 			cur = cur->next;
 			break;
 		case LEX_NODE:
+			// fall-through
+		case LEX_CUR_NODE:
 			cur->next = ast_alloc_node(AST_SELECTOR, "AST_SELECTOR");
 			cur = cur->next;
+			if (lex_tok[*lex_idx] == LEX_CUR_NODE) {
+				cur->data.d_selector.child_scope = true;
+			} else {
+				cur->data.d_selector.child_scope = false;
+			}
 			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
 			break;
 		case LEX_FILTER_START:
@@ -305,64 +312,65 @@ operator_type get_token_type(struct ast_node* tok)
 
 bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 {
-	return false;
-	// stack s;
-	// stack_init(&s);
-	// expr_operator* expr_lh;
-	// expr_operator* expr_rh;
+	stack s;
+	stack_init(&s);
+	struct ast_node* expr_lh;
+	struct ast_node* expr_rh;
 
-	// /* Temporary operators that store intermediate evaluations */
-	// expr_operator op_true;
+	/* Temporary operators that store intermediate evaluations */
+	struct ast_node op_true;
 
-	// op_true.type = AST_BOOL;
-	// op_true.value_bool = true;
+	op_true.type = AST_BOOL;
+	op_true.data.d_literal.value_bool = true;
 
-	// expr_operator op_false;
+	struct ast_node op_false;
 
-	// op_false.type = AST_BOOL;
-	// op_false.value_bool = false;
+	op_false.type = AST_BOOL;
+	op_true.data.d_literal.value_bool = false;
 
-	// int i = 0;
+	while (tok != NULL) {
 
-	// while (i < count) {
+		if (tok->type == AST_EXPR_END) {
+			break;
+		} else if (tok->next == NULL) {
+			// TODO error about missing expression end
+		}
 
-	// 	switch (get_token_type((*op).type)) {
-	// 	case TYPE_OPERATOR:
+		switch (get_token_type(tok->type)) {
+		case TYPE_OPERATOR:
+
+			if (!is_unary(tok->type)) {
+				expr_rh = stack_top(&s);
+				stack_pop(&s);
+				expr_lh = stack_top(&s);
+			}
+			else {
+				expr_rh = stack_top(&s);
+				expr_lh = expr_rh;
+			}
+
+			stack_pop(&s);
+
+			if (exec_cb_by_token(tok->type) (expr_lh, expr_rh)) {
+				stack_push(&s, &op_true);
+			}
+			else {
+				stack_push(&s, &op_false);
+			}
+
+			break;
+		case TYPE_OPERAND:
+			stack_push(&s, tok);
+			break;
+		}
+
+		tok = tok->next;
+	}
 
 
-	// 		/* call evaluateAST */
-	// 		if (!is_unary((*op).type)) {
-	// 			expr_rh = stack_top(&s);
-	// 			stack_pop(&s);
-	// 			expr_lh = stack_top(&s);
-	// 		}
-	// 		else {
-	// 			expr_rh = stack_top(&s);
-	// 			expr_lh = expr_rh;
-	// 		}
+	expr_lh = stack_top(&s);
 
-	// 		stack_pop(&s);
-
-	// 		if (exec_cb_by_token((*op).type) (expr_lh, expr_rh)) {
-	// 			stack_push(&s, &op_true);
-	// 		}
-	// 		else {
-	// 			stack_push(&s, &op_false);
-	// 		}
-
-	// 		break;
-	// 	case TYPE_OPERAND:
-	// 		stack_push(&s, op);
-	// 		break;
-	// 	}
-
-	// 	i++;
-	// 	op++;
-	// }
-
-	// expr_lh = stack_top(&s);
-
-	// return (*expr_lh).value_bool;
+	return expr_lh->data.d_literal.value_bool;
 }
 
 compare_cb exec_cb_by_token(enum ast_type type)

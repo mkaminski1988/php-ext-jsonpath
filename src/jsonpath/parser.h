@@ -48,6 +48,7 @@ union ast_node_data {
     } d_list;
     struct {
         char value[PARSE_BUF_LEN];
+        bool child_scope; /* @.selector if true, else $.selector */
     } d_selector;
     struct {
         char value[PARSE_BUF_LEN];
