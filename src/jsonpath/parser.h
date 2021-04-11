@@ -13,13 +13,29 @@
 /* AST stuff */
 
 enum ast_type {
+    AST_AND,
+    AST_BOOL,
+    AST_EQ,
+    AST_EXPR_END,
+    AST_EXPR_START,
     AST_FILTER,
+    AST_GT,
+    AST_GTE,
     AST_INDEX_LIST,
     AST_INDEX_SLICE,
+    AST_ISSET,
+    AST_LITERAL_BOOL,
+    AST_LITERAL,
+    AST_LT,
+    AST_LTE,
+    AST_NE,
+    AST_OR,
+    AST_PAREN_LEFT,
+    AST_PAREN_RIGHT,
     AST_RECURSE,
+    AST_RGXP,
     AST_ROOT,
     AST_SELECTOR,
-    AST_UNKNOWN,
     AST_WILD_CARD
 };
 
@@ -32,6 +48,12 @@ union ast_node_data {
     struct {
         char value[PARSE_BUF_LEN];
     } d_selector;
+    struct {
+        char value[PARSE_BUF_LEN];
+    } d_literal;
+    struct {
+        struct ast_node* node;
+    } d_expression;
 };
 
 struct ast_node {
@@ -42,44 +64,6 @@ struct ast_node {
 };
 
 /* AST stuff */
-
-typedef enum {
-    DEFAULT,
-    ROOT,
-    WILD_CARD,
-    DEEP_SCAN,
-    CHILD_KEY,
-    TYPE_OPERAND,
-    TYPE_OPERATOR,
-    TYPE_PAREN,
-} operator_type;
-
-typedef enum {
-    FLTR_RANGE,
-    FLTR_INDEX,
-    FLTR_WILD_CARD,
-    FLTR_NODE,
-    FLTR_EXPR
-} filter_type;
-
-typedef enum {
-    EXPR_EQ,           // 0
-    EXPR_NE,           // 1
-    EXPR_LT,           // 2
-    EXPR_LTE,          // 3
-    EXPR_GT,           // 4
-    EXPR_GTE,          // 5
-    EXPR_ISSET,        // 6
-    EXPR_OR,           // 7
-    EXPR_AND,          // 8
-    EXPR_PAREN_LEFT,   // 9
-    EXPR_PAREN_RIGHT,  // 10
-    EXPR_LITERAL,      // 11
-    EXPR_LITERAL_BOOL, // 12
-    EXPR_BOOL,         // 13
-    EXPR_NODE_NAME,    // 14
-    EXPR_RGXP          // 15
-} expr_op_type;
 
 typedef struct {
     expr_op_type type;
@@ -142,15 +126,5 @@ void parseFilterList(
 );
 
 void* jpath_malloc(size_t size);
-
-
-struct ASTNode {
-
-};
-
-union NodeData {
-
-};
-
 
 #endif				/* PARSER_H */

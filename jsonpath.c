@@ -349,6 +349,52 @@ void executeSlice(zval* arr, struct ast_node* tok, zval* return_value)
     }
 }
 
+void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
+{
+    zend_ulong num_key;
+    zend_string* key;
+    zval* data;
+
+    struct ast_node* ptr
+
+    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
+
+        ptr = tok->d_expression.node;
+
+        // For each array entry, find the node names and populate their values
+        // Fill up expression NODE_NAME VALS
+        while (ptr != NULL) {
+            if (ptr->next != NULL && ptr->next.type == AST_ISSET) {
+                resolveIssetSelector(data, ptr);
+            }
+            else if (ptr->type == AST_SELECTOR) {
+                resolvePropertySelectorValue(data, ptr);
+            }
+            ptr = ptr-next;
+        }
+
+        if (evaluate_postfix_expression(tok->d_expression.node)) {
+            if (tok->next == NULL) {
+                copyToReturnResult(data, return_value);
+            }
+            else {
+                evaluateAST(data, tok->next, return_value);
+            }
+        }
+
+        ptr = tok->d_expression.node;
+
+        // Clean up node values to prevent incorrect node values during recursive wildcard iterations
+        while (ptr != NULL) {
+            if (ptr->type == AST_SELECTOR) {
+                ptr->d_selector.value[0] = '\0';
+            }
+            ptr = ptr-next;
+        }
+    }
+    ZEND_HASH_FOREACH_END();
+}
+
 /* populate the expression operator with the array value that */
 /* corresponds to the JSON-path object selector. */
 /* e.g. $.path.to.val -> $[path][to][val] */
