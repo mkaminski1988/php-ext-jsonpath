@@ -148,7 +148,7 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
 {
     while (tok != NULL) {
 
-        // printf("evaluateAST Type: %s\n", tok->type_s);
+        // printf("evaluateAST Type: %s\n", ast_str[tok->type]);
 
         switch (tok->type) {
         case AST_INDEX_LIST:
@@ -198,7 +198,7 @@ struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return
     //     printf("\t");
     // }
 
-    // printf("execSelectorChain Type: %s Value: %s\n", tok->type_s, tok->data.d_selector.value);
+    // printf("execSelectorChain Type: %s Value: %s\n", ast_str[tok->type], tok->data.d_selector.value);
 
     if (Z_TYPE_P(arr) != IS_ARRAY) {
         return NULL;
@@ -240,7 +240,7 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
     // for (int i = 0; i < xy; i++) {
     //     printf("\t");
     // }
-    // printf("execRecursiveArrayWalk Type: %s Value: %s\n", tok->type_s, tok->data.d_selector.value);
+    // printf("execRecursiveArrayWalk Type: %s Value: %s\n", ast_str[tok->type], tok->data.d_selector.value);
 
     if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
         return;

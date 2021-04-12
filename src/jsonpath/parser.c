@@ -8,20 +8,49 @@
 bool is_unary(enum ast_type);
 int get_operator_precedence(struct ast_node* tok);
 
-struct ast_node* ast_alloc_node(enum ast_type type, const char* type_s) {
-	// printf("Allocating %s\n", type_s);
-	struct ast_node* ptr = emalloc(sizeof(struct ast_node));
-	ptr->next = NULL;
-	ptr->type = type;
-	ptr->type_s = type_s;
-	return ptr;
+const char* ast_str[] = {
+    "AST_AND",
+    "AST_BOOL",
+    "AST_EQ",
+    "AST_EXPR_END",
+    "AST_EXPR_START",
+    "AST_GT",
+    "AST_GTE",
+    "AST_INDEX_LIST",
+    "AST_INDEX_SLICE",
+    "AST_ISSET",
+    "AST_LITERAL_BOOL",
+    "AST_LITERAL",
+    "AST_LT",
+    "AST_LTE",
+    "AST_NE",
+    "AST_OR",
+    "AST_PAREN_LEFT",
+    "AST_PAREN_RIGHT",
+    "AST_RECURSE",
+    "AST_RGXP",
+    "AST_ROOT",
+    "AST_SELECTOR",
+    "AST_WILD_CARD"
+};
+
+struct ast_node* ast_alloc_node(struct ast_node* prev, enum ast_type type)
+{
+	struct ast_node* next = emalloc(sizeof(struct ast_node));
+	next->next = NULL;
+	next->type = type;
+
+	prev->next = next;
+
+	return next;
 }
 
-void print_ast(struct ast_node* head) {
+void print_ast(struct ast_node* head)
+{
 	printf("--------------------------------\n");
 	printf("AST Structure\n\n");
 	while (head != NULL) {
-		printf("\t➔ %s\n", head->type_s);
+		printf("\t➔ %s\n", ast_str[head->type]);
 		switch (head->type) {
 		case AST_SELECTOR:
 			printf("\t\t• %s\n", head->data.d_selector.value);
@@ -115,8 +144,8 @@ void convert_to_postfix(struct ast_node* expr_start)
 		tmp = stack_top(&s);
 		pfix->next = tmp;
 		pfix = pfix->next;
-		printf("end stack_pop::%s\n", pfix->type_s);
-		printf("append::%s\n", pfix->type_s);
+		printf("end stack_pop::%s\n", ast_str[pfix->type]);
+		printf("append::%s\n", ast_str[pfix->type]);
 		stack_pop(&s);
 	}
 
@@ -139,25 +168,20 @@ bool build_parse_tree(
 
 		switch (lex_tok[*lex_idx]) {
 		case LEX_WILD_CARD:
-			// todo : create a macro here
-			cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_WILD_CARD);
 			break;
 		case LEX_ROOT:
-			cur->next = ast_alloc_node(AST_ROOT, "AST_ROOT");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_ROOT);
 			break;
 		case LEX_DEEP_SCAN:
-			cur->next = ast_alloc_node(AST_RECURSE, "AST_RECURSE");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_RECURSE);
 			break;
 		case LEX_CUR_NODE:
 			// noop
 			break;
 		case LEX_NODE:
 			// fall-through
-			cur->next = ast_alloc_node(AST_SELECTOR, "AST_SELECTOR");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_SELECTOR);
 			if (lex_tok[*lex_idx] == LEX_CUR_NODE) {
 				cur->data.d_selector.child_scope = true;
 			} else {
@@ -180,13 +204,11 @@ bool build_parse_tree(
 				case LEX_SLICE:
 					// fall-through
 				case LEX_CHILD_SEP:
-					cur->next = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
-					cur = cur->next;
+					cur = ast_alloc_node(cur, AST_INDEX_SLICE);
 					parse_filter_list(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
 					break;
 				case LEX_WILD_CARD:
-					cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
-					cur = cur->next;
+					cur = ast_alloc_node(cur, AST_WILD_CARD);
 					break;
 				case LEX_EXPR_END:
 					strncpy(err->msg, "Filter must not be empty", sizeof(err->msg));
@@ -202,25 +224,20 @@ bool build_parse_tree(
 
 			break;
 		case LEX_EXPR_START:
-			cur->next = ast_alloc_node(AST_EXPR_START, "AST_EXPR_START");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_EXPR_START);
 			cur_expr_start = cur;
 			break;
 		case LEX_PAREN_OPEN:
-			cur->next = ast_alloc_node(AST_PAREN_LEFT, "AST_PAREN_LEFT");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_PAREN_LEFT);
 			break;
 		case LEX_PAREN_CLOSE:
 			if (cur->type == AST_SELECTOR) {
-				cur->next = ast_alloc_node(AST_ISSET, "AST_ISSET");
-				cur = cur->next;
+				cur = ast_alloc_node(cur, AST_ISSET);
 			}
-			cur->next = ast_alloc_node(AST_PAREN_RIGHT, "AST_PAREN_RIGHT");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_PAREN_RIGHT);
 			break;
 		case LEX_LITERAL:
-			cur->next = ast_alloc_node(AST_LITERAL, "AST_LITERAL");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_LITERAL);
 
 			if (jp_str_cpy(cur->data.d_literal.value, PARSE_BUF_LEN, lex_tok_values[*lex_idx], strlen(lex_tok_values[*lex_idx])) > 0) {
 				strncpy(err->msg, "Buffer size exceeded", sizeof(err->msg));
@@ -229,8 +246,7 @@ bool build_parse_tree(
 
 			break;
 		case LEX_LITERAL_BOOL:
-			cur->next = ast_alloc_node(AST_LITERAL_BOOL, "AST_LITERAL_BOOL");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_LITERAL_BOOL);
 
 			if (jp_str_cpy(cur->data.d_literal.value, PARSE_BUF_LEN, lex_tok_values[*lex_idx], strlen(lex_tok_values[*lex_idx])) > 0) {
 				strncpy(err->msg, "Buffer size exceeded", sizeof(err->msg));
@@ -245,44 +261,34 @@ bool build_parse_tree(
 			}
 			break;
 		case LEX_LT:
-			cur->next = ast_alloc_node(AST_LT, "AST_LT");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_LT);
 			break;
 		case LEX_LTE:
-			cur->next = ast_alloc_node(AST_LTE, "AST_LTE");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_LTE);
 			break;
 		case LEX_GT:
-			cur->next = ast_alloc_node(AST_GT, "AST_GT");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_GT);
 			break;
 		case LEX_GTE:
-			cur->next = ast_alloc_node(AST_GTE, "AST_GTE");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_GTE);
 			break;
 		case LEX_NEQ:
-			cur->next = ast_alloc_node(AST_NE, "AST_NE");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_NE);
 			break;
 		case LEX_EQ:
-			cur->next = ast_alloc_node(AST_EQ, "AST_EQ");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_EQ);
 			break;
 		case LEX_OR:
-			cur->next = ast_alloc_node(AST_OR, "AST_OR");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_OR);
 			break;
 		case LEX_AND:
-			cur->next = ast_alloc_node(AST_AND, "AST_AND");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_AND);
 			break;
 		case LEX_RGXP:
-			cur->next = ast_alloc_node(AST_RGXP, "AST_RGXP");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_RGXP);
 			break;
 		case LEX_EXPR_END:
-			cur->next = ast_alloc_node(AST_EXPR_END, "AST_EXPR_END");
-			cur = cur->next;
+			cur = ast_alloc_node(cur, AST_EXPR_END);
 			convert_to_postfix(cur_expr_start);
 			cur_expr_start = NULL;
 			break;
@@ -318,11 +324,9 @@ void parse_filter_list(
 		}
 		else if (lex_tok[*lex_idx] == LEX_CHILD_SEP) {
 			tok->type = AST_INDEX_LIST;
-			tok->type_s = "AST_INDEX_LIST";
 		}
 		else if (lex_tok[*lex_idx] == LEX_SLICE) {
 			tok->type = AST_INDEX_SLICE;
-			tok->type_s = "AST_INDEX_SLICE";
 
 			slice_count++;
 			// [:a] => [0:a]
@@ -509,7 +513,7 @@ int get_operator_precedence(struct ast_node* tok)
 	case AST_LITERAL_BOOL:
 	case AST_BOOL:
 	default:
-		printf("Error, no operator precedence for %s", tok->type_s);
+		printf("Error, no operator precedence for %s", ast_str[tok->type]);
 		break;
 	}
 }

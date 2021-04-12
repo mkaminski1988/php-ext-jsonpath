@@ -40,6 +40,8 @@ enum ast_type {
     AST_WILD_CARD
 };
 
+extern const char* ast_str[];
+
 union ast_node_data {
     struct {
         int count;
@@ -61,7 +63,6 @@ union ast_node_data {
 
 struct ast_node {
     struct ast_node* next;
-    const char* type_s;
     enum ast_type type;
     union ast_node_data data;
 };
