@@ -163,13 +163,40 @@ bool build_parse_tree(
 			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
 			break;
 		case LEX_FILTER_START:
-			if (lex_tok[(*lex_idx)+1] == LEX_LITERAL || lex_tok[(*lex_idx)+1] == LEX_SLICE) {
-				(*lex_idx)++;
-				cur->next = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
-				cur = cur->next;
-				parse_filter_list(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
+
+			if (*lex_idx == lex_tok_count - 1) { /* last token */
+				strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
+				return false;
 			}
-			// else we should have a wildcard
+
+			(*lex_idx)++;
+
+			switch (lex_tok[*lex_idx]) {
+				case LEX_LITERAL:
+					// fall-through
+				case LEX_SLICE:
+					// fall-through
+				case LEX_CHILD_SEP:
+					cur->next = ast_alloc_node(AST_INDEX_SLICE, "AST_INDEX_SLICE");
+					cur = cur->next;
+					parse_filter_list(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
+					break;
+				case LEX_WILD_CARD:
+					cur->next = ast_alloc_node(AST_WILD_CARD, "AST_WILD_CARD");
+					cur = cur->next;
+					break;
+				case LEX_EXPR_END:
+					strncpy(err->msg, "Filter must not be empty", sizeof(err->msg));
+					return false;
+			}
+
+			if (*lex_idx == lex_tok_count - 1 || lex_tok[(*lex_idx)+1] != LEX_EXPR_END) { /* last token */
+				strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
+				return false;
+			}
+
+			(*lex_idx)++;
+
 			break;
 		case LEX_EXPR_START:
 			cur->next = ast_alloc_node(AST_EXPR_START, "AST_EXPR_START");
@@ -282,6 +309,8 @@ void parse_filter_list(
 
 	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
 		if (lex_tok[*lex_idx] == LEX_EXPR_END) {
+			/* lex_idx must point to LEX_EXPR_END after function returns */
+			(*lex_idx)--;
 			return;
 		}
 		else if (lex_tok[*lex_idx] == LEX_CHILD_SEP) {

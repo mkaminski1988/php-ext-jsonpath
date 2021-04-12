@@ -72,7 +72,7 @@ PHP_METHOD(JsonPath, find)
     }
 
     // print_ast(head.next);
-
+    
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
     array_init(return_value);
@@ -117,6 +117,8 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
                 "The query is too long. Token count exceeds PARSE_BUF_LEN.", 0);
             return false;
         }
+
+        // printf("\t➔ %s\n", visible[cur_tok]);
 
         switch (cur_tok) {
         case LEX_NODE:
