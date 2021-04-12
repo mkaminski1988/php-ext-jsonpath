@@ -74,7 +74,7 @@ typedef bool(*compare_cb) (struct ast_node*, struct ast_node*);
 
 bool evaluate_postfix_expression(zval* arr, struct ast_node* tok);
 compare_cb exec_cb_by_token(enum ast_type);
-operator_type get_token_type(struct ast_node*);
+operator_type get_token_type(enum ast_type);
 
 bool compare_lt(struct ast_node* lh, struct ast_node* rh);
 bool compare_lte(struct ast_node* lh, struct ast_node* rh);

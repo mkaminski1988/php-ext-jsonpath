@@ -6,7 +6,7 @@
 #include "safe_string.h"
 
 bool is_unary(enum ast_type);
-int get_operator_precedence(enum ast_type);
+int get_operator_precedence(struct ast_node* tok);
 
 struct ast_node* ast_alloc_node(enum ast_type type, const char* type_s) {
 	// printf("Allocating %s\n", type_s);
@@ -17,35 +17,109 @@ struct ast_node* ast_alloc_node(enum ast_type type, const char* type_s) {
 	return ptr;
 }
 
-struct ast_node* push_operator(stack* s, struct ast_node* cur) {
-
-	if (!s->size || (*stack_top(s)).type == AST_PAREN_LEFT) {
-		stack_push(s, cur);
-		return NULL;
+void print_ast(struct ast_node* head) {
+	printf("--------------------------------\n");
+	printf("AST Structure\n\n");
+	while (head != NULL) {
+		printf("\t➔ %s\n", head->type_s);
+		switch (head->type) {
+		case AST_SELECTOR:
+			printf("\t\t• %s\n", head->data.d_selector.value);
+			break;
+		case AST_LITERAL:
+			printf("\t\t• %s\n", head->data.d_literal.value);
+			break;
+		case AST_LITERAL_BOOL:
+			printf("\t\t• %s\n", head->data.d_literal.value_bool);
+			break;
+		}
+		if (head->type == AST_EXPR_END) {
+			break;
+		}
+		head = head->next;
 	}
-
-	struct ast_node* tmp = stack_top(s);
-
-	//TODO compare macro or assign to var?
-	if (get_operator_precedence(cur->type) > get_operator_precedence(tmp->type)) {
-		stack_push(s, cur);
-		return NULL;
-	}
-
-	if (get_operator_precedence(cur->type) < get_operator_precedence(tmp->type)) {
-		tmp = stack_top(s);
-		stack_pop(s);
-	}
-	else {
-		tmp = stack_top(s);
-		stack_pop(s);
-		stack_push(s, cur);
-	}
-
-	return tmp;
+	printf("--------------------------------\n");
 }
 
-/* See http://csis.pace.edu/~wolf/CS122/infix-postfix.htm */
+// See http://csis.pace.edu/~wolf/CS122/infix-postfix.htm
+void convert_to_postfix(struct ast_node* expr_start)
+{
+	stack s;
+	stack_init(&s);
+	struct ast_node* cur = expr_start->next; /* after AST_AST_START */
+	struct ast_node* tmp;
+	struct ast_node* pfix = expr_start;
+
+	while (cur->type != AST_EXPR_END) {
+
+		switch (get_token_type(cur->type)) {
+		case TYPE_OPERAND:
+			pfix->next = cur;
+			pfix = pfix->next;
+			cur = cur->next;
+			break;
+		case TYPE_OPERATOR:
+			if (!s.size || stack_top(&s)->type == AST_PAREN_LEFT) {
+				stack_push(&s, cur);
+				cur = cur->next;
+			}
+			else {
+				tmp = stack_top(&s);
+
+				//TODO compare macro or assign to var?
+				if (get_operator_precedence(cur) > get_operator_precedence(tmp)) {
+					stack_push(&s, cur);
+					cur = cur->next;
+				}
+				else if (get_operator_precedence(cur) < get_operator_precedence(tmp)) {
+					pfix->next = tmp;
+					pfix = pfix->next;
+					stack_pop(&s);
+				}
+				else {
+					pfix->next = tmp;
+					pfix = pfix->next;
+					
+					stack_pop(&s);
+					stack_push(&s, cur);
+					cur = cur->next;
+				}
+			}
+			break;
+		case TYPE_PAREN:
+			if (cur->type == AST_PAREN_LEFT) {
+				stack_push(&s, cur);
+				cur = cur->next;
+			}
+			else {
+				cur = cur->next;
+				while (s.size > 0) {
+					tmp = stack_top(&s);
+					stack_pop(&s);
+					if (tmp->type == AST_PAREN_LEFT) {
+						break;
+					}
+					pfix->next = tmp;
+					pfix = pfix->next;
+				}
+			}
+			break;
+		}
+	}
+
+	/* remove remaining elements */
+	while (s.size > 0) {
+		tmp = stack_top(&s);
+		pfix->next = tmp;
+		pfix = pfix->next;
+		printf("end stack_pop::%s\n", pfix->type_s);
+		printf("append::%s\n", pfix->type_s);
+		stack_pop(&s);
+	}
+
+	pfix->next = cur;
+}
+
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],
 	char lex_tok_values[][PARSE_BUF_LEN],
@@ -56,13 +130,11 @@ bool build_parse_tree(
 ) {
 
 	struct ast_node* cur = head;
-	struct ast_node* tmp;
-	stack s;
-	stack_init(&s);
-
-	int expr_start_count = 0;
+	struct ast_node* cur_expr_start = NULL;
 
 	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
+
+		printf("build_parse_tree %s\n", visible[lex_tok[*lex_idx]]);
 
 		switch (lex_tok[*lex_idx]) {
 		case LEX_WILD_CARD:
@@ -78,9 +150,11 @@ bool build_parse_tree(
 			cur->next = ast_alloc_node(AST_RECURSE, "AST_RECURSE");
 			cur = cur->next;
 			break;
+		case LEX_CUR_NODE:
+			// noop
+			break;
 		case LEX_NODE:
 			// fall-through
-		case LEX_CUR_NODE:
 			cur->next = ast_alloc_node(AST_SELECTOR, "AST_SELECTOR");
 			cur = cur->next;
 			if (lex_tok[*lex_idx] == LEX_CUR_NODE) {
@@ -89,6 +163,7 @@ bool build_parse_tree(
 				cur->data.d_selector.child_scope = false;
 			}
 			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
+			printf("\tval: %s\n", cur->data.d_selector.value);
 			break;
 		case LEX_FILTER_START:
 			if (lex_tok[(*lex_idx)+1] == LEX_LITERAL || lex_tok[(*lex_idx)+1] == LEX_SLICE) {
@@ -102,27 +177,19 @@ bool build_parse_tree(
 		case LEX_EXPR_START:
 			cur->next = ast_alloc_node(AST_EXPR_START, "AST_EXPR_START");
 			cur = cur->next;
-			expr_start_count++;
+			cur_expr_start = cur;
 			break;
 		case LEX_PAREN_OPEN:
-			stack_push(&s, ast_alloc_node(AST_PAREN_LEFT, "AST_PAREN_LEFT"));
+			cur->next = ast_alloc_node(AST_PAREN_LEFT, "AST_PAREN_LEFT");
+			cur = cur->next;
 			break;
 		case LEX_PAREN_CLOSE:
 			if (cur->type == AST_SELECTOR) {
 				cur->next = ast_alloc_node(AST_ISSET, "AST_ISSET");
 				cur = cur->next;
-			} else {
-				// TODO move to function
-				while (s.size) {
-					tmp = stack_top(&s);
-					stack_pop(&s);
-					if (tmp->type == AST_PAREN_LEFT) {
-						break;
-					}
-					cur->next = tmp;
-					cur = cur->next;
-				}
 			}
+			cur->next = ast_alloc_node(AST_PAREN_RIGHT, "AST_PAREN_RIGHT");
+			cur = cur->next;
 			break;
 		case LEX_LITERAL:
 			cur->next = ast_alloc_node(AST_LITERAL, "AST_LITERAL");
@@ -132,6 +199,7 @@ bool build_parse_tree(
 				strncpy(err->msg, "Buffer size exceeded", sizeof(err->msg));
 				return false;
 			}
+
 			break;
 		case LEX_LITERAL_BOOL:
 			cur->next = ast_alloc_node(AST_LITERAL_BOOL, "AST_LITERAL_BOOL");
@@ -150,80 +218,46 @@ bool build_parse_tree(
 			}
 			break;
 		case LEX_LT:
-			tmp = push_operator(&s, ast_alloc_node(AST_LT, "AST_LT"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_LT, "AST_LT");
+			cur = cur->next;
 			break;
 		case LEX_LTE:
-			tmp = push_operator(&s, ast_alloc_node(AST_LTE, "AST_LTE"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_LTE, "AST_LTE");
+			cur = cur->next;
 			break;
 		case LEX_GT:
-			tmp = push_operator(&s, ast_alloc_node(AST_GT, "AST_GT"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_GT, "AST_GT");
+			cur = cur->next;
 			break;
 		case LEX_GTE:
-			tmp = push_operator(&s, ast_alloc_node(AST_GTE, "AST_GTE"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_GTE, "AST_GTE");
+			cur = cur->next;
 			break;
 		case LEX_NEQ:
-			tmp = push_operator(&s, ast_alloc_node(AST_NE, "AST_NE"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_NE, "AST_NE");
+			cur = cur->next;
 			break;
 		case LEX_EQ:
-			tmp = push_operator(&s, ast_alloc_node(AST_EQ, "AST_EQ"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_EQ, "AST_EQ");
+			cur = cur->next;
 			break;
 		case LEX_OR:
-			tmp = push_operator(&s, ast_alloc_node(AST_OR, "AST_OR"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_OR, "AST_OR");
+			cur = cur->next;
 			break;
 		case LEX_AND:
-			tmp = push_operator(&s, ast_alloc_node(AST_AND, "AST_AND"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_AND, "AST_AND");
+			cur = cur->next;
 			break;
 		case LEX_RGXP:
-			tmp = push_operator(&s, ast_alloc_node(AST_RGXP, "AST_RGXP"));
-			if (tmp != NULL) {
-				cur->next = tmp;
-				cur = cur->next;
-			}
+			cur->next = ast_alloc_node(AST_RGXP, "AST_RGXP");
+			cur = cur->next;
 			break;
 		case LEX_EXPR_END:
 			cur->next = ast_alloc_node(AST_EXPR_END, "AST_EXPR_END");
 			cur = cur->next;
-
-			/* Remove remaining elements */
-			while (s.size > 0) {
-				cur->next = stack_top(&s);
-				cur = cur->next;
-				stack_pop(&s);
-			}
-
-			expr_start_count--;
+			convert_to_postfix(cur_expr_start);
+			cur_expr_start = NULL;
 			break;
 		default:
 			// printf("build_parse_tree: default\n");
@@ -231,11 +265,11 @@ bool build_parse_tree(
 		}
 	}
 
-	if (expr_start_count != 0) {
-		/* we made it to the end without finding an expression terminator */
-		strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
-		return false;
-	}
+	// if (expr_start_count != 0) {
+	// 	/* we made it to the end without finding an expression terminator */
+	// 	strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
+	// 	return false;
+	// }
 
 	return true;
 }
@@ -285,9 +319,9 @@ void parse_filter_list(
 	}
 }
 
-operator_type get_token_type(struct ast_node* tok)
+operator_type get_token_type(enum ast_type type)
 {
-	switch (tok->type) {
+	switch (type) {
 	case AST_EQ:
 	case AST_NE:
 	case AST_LT:
@@ -298,6 +332,7 @@ operator_type get_token_type(struct ast_node* tok)
 	case AST_AND:
 	case AST_ISSET:
 	case AST_RGXP:
+	case AST_EXPR_END:
 		return TYPE_OPERATOR;
 	case AST_PAREN_LEFT:
 	case AST_PAREN_RIGHT:
@@ -305,6 +340,7 @@ operator_type get_token_type(struct ast_node* tok)
 	case AST_LITERAL:
 	case AST_LITERAL_BOOL:
 	case AST_BOOL:
+	case AST_SELECTOR:
 		/* make eval ast return strings? */
 		return TYPE_OPERAND;
 	}
@@ -329,6 +365,8 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 	op_true.data.d_literal.value_bool = false;
 
 	while (tok != NULL) {
+
+		printf("evaluate_postfix_expression::%s\n", tok->type_s);
 
 		if (tok->type == AST_EXPR_END) {
 			break;
@@ -413,9 +451,10 @@ bool is_unary(enum ast_type type)
 }
 
 //TODO: Distinguish between operator and token?
-int get_operator_precedence(enum ast_type type)
+int get_operator_precedence(struct ast_node* tok)
 {
-	switch (type) {
+	printf("op precedence: %s", tok->type_s);
+	switch (tok->type) {
 	case AST_ISSET:
 		return 10000;
 	case AST_LT:
@@ -443,7 +482,7 @@ int get_operator_precedence(enum ast_type type)
 	case AST_LITERAL_BOOL:
 	case AST_BOOL:
 	default:
-		printf("Error, no operator precedence for token");
+		printf("Error, no operator precedence for %s", tok->type_s);
 		break;
 	}
 }

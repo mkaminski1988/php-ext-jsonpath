@@ -71,6 +71,8 @@ PHP_METHOD(JsonPath, find)
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
+    print_ast(head.next);
+
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
     array_init(return_value);
@@ -549,6 +551,9 @@ bool compare_or(struct ast_node* lh, struct ast_node* rh)
 
 bool compare_eq(struct ast_node* lh, struct ast_node* rh)
 {
+
+    printf("%s == %s ?", lh->type_s, rh->type_s);
+
     zval a, b, result;
 
     ZVAL_STRING(&a, (*lh).data.d_literal.value);
