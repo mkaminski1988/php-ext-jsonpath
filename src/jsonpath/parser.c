@@ -89,7 +89,9 @@ void convert_to_postfix(struct ast_node* expr_start)
 		case TYPE_PAREN:
 			if (cur->type == AST_PAREN_LEFT) {
 				stack_push(&s, cur);
+				tmp = cur;
 				cur = cur->next;
+				efree(tmp);
 			}
 			else {
 				cur = cur->next;
@@ -97,6 +99,7 @@ void convert_to_postfix(struct ast_node* expr_start)
 					tmp = stack_top(&s);
 					stack_pop(&s);
 					if (tmp->type == AST_PAREN_LEFT) {
+						efree(tmp);
 						break;
 					}
 					pfix->next = tmp;
