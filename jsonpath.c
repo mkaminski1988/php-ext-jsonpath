@@ -24,7 +24,7 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value);
 void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value);
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
-void resolvePropertySelectorValue(zval* arr, struct ast_node* node);
+zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok);
 void resolveIssetSelector(zval* arr, struct ast_node* node);
 struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void execWildcard(zval* arr, struct ast_node* tok, zval* return_value);
@@ -71,8 +71,8 @@ PHP_METHOD(JsonPath, find)
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
-    // print_ast(head.next);
-    
+    print_ast(head.next);
+
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
     array_init(return_value);
@@ -173,7 +173,7 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
             execWildcard(arr, tok, return_value);
             return;
         case AST_EXPR_START:
-            // executeExpression(arr, tok, return_value);
+            executeExpression(arr, tok, return_value);
             tok = tok->next;
             break;
         case AST_EXPR_END:
@@ -363,7 +363,21 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
 
     // struct ast_node* ptr;
 
-    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
+    if (evaluate_postfix_expression(arr, tok->next)) {
+        printf("IS CONDITIONAL");
+        if (tok->next == NULL) {
+            printf("IS NULL");
+            copyToReturnResult(data, return_value);
+        }
+        else {
+            printf("IS NOT NULL");
+            evaluateAST(data, tok->next, return_value);
+        }
+    } else {
+        printf("IS FALSE");
+    }
+
+    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
 
         // ptr = tok;
 
@@ -379,14 +393,6 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
         //     ptr = ptr->next;
         // }
 
-        if (evaluate_postfix_expression(data, tok->next)) {
-            if (tok->next == NULL) {
-                copyToReturnResult(data, return_value);
-            }
-            else {
-                evaluateAST(data, tok->next, return_value);
-            }
-        }
 
         // ptr = tok;
 
@@ -397,66 +403,26 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
         //     }
         //     ptr = ptr->next;
         // }
-    }
-    ZEND_HASH_FOREACH_END();
+    // }
+    // ZEND_HASH_FOREACH_END();
 }
 
 /* populate the expression operator with the array value that */
 /* corresponds to the JSON-path object selector. */
 /* e.g. $.path.to.val -> $[path][to][val] */
-void resolvePropertySelectorValue(zval* arr, struct ast_node* node)
+zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok)
 {
-    // if (Z_TYPE_P(arr) != IS_ARRAY) {
-    //     return;
-    // }
+    zval* data;
 
-    // zval* data;
+    while (tok->type == AST_SELECTOR) {
+        if ((data = zend_hash_str_find(HASH_OF(arr), tok->data.d_selector.value, strlen(tok->data.d_selector.value))) == NULL) {
+            return NULL;
+        }
+        arr = data;
+        tok = tok->next;
+    }
 
-    // while (node->type == AST_SELECTOR) {
-    //     if ((data = zend_hash_str_find(HASH_OF(arr), node->data.d_selector.value, strlen(node->label[i]))) == NULL) {
-    //         return;
-    //     }
-    //     arr = data;
-    // }
-
-    // /* we can't compare strings/numbers to non-scalar values in JSON-path */
-    // if (!is_scalar(data)) {
-    //     return;
-    // }
-
-    // if (Z_TYPE_P(data) == IS_TRUE) {
-    //     strncpy(node->value, "JP_LITERAL_TRUE", 15);
-    //     node->value[15] = '\0';
-    // }
-    // else if (Z_TYPE_P(data) == IS_FALSE) {
-    //     strncpy(node->value, "JP_LITERAL_FALSE", 16);
-    //     node->value[16] = '\0';
-    // }
-    // else if (Z_TYPE_P(data) != IS_STRING) {
-
-    //     zval zcopy;
-
-    //     int free_zcopy = zend_make_printable_zval(data, &zcopy);
-    //     if (free_zcopy) {
-    //         data = &zcopy;
-    //     }
-
-    //     size_t s_len = Z_STRLEN_P(data);
-    //     char* s = Z_STRVAL_P(data);
-
-    //     strncpy(node->value, s, s_len);
-    //     node->value[s_len] = '\0';
-
-    //     if (free_zcopy) {
-    //         zval_dtor(&zcopy);
-    //     }
-    // }
-    // else {
-    //     size_t s_len = Z_STRLEN_P(data);
-    //     char* s = Z_STRVAL_P(data);
-    //     strncpy(node->value, s, s_len);
-    //     node->value[s_len] = '\0';
-    // }
+    return arr;
 }
 
 /* assign the isset() operator a boolean value based on whether there is an */
@@ -477,7 +443,7 @@ void resolveIssetSelector(zval* arr, struct ast_node* node)
     // }
 }
 
-bool compare_lt(struct ast_node* lh, struct ast_node* rh)
+bool compare_lt(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
@@ -493,7 +459,7 @@ bool compare_lt(struct ast_node* lh, struct ast_node* rh)
     return res;
 }
 
-bool compare_gt(struct ast_node* lh, struct ast_node* rh)
+bool compare_gt(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
@@ -509,7 +475,7 @@ bool compare_gt(struct ast_node* lh, struct ast_node* rh)
     return res;
 }
 
-bool compare_lte(struct ast_node* lh, struct ast_node* rh)
+bool compare_lte(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
@@ -525,7 +491,7 @@ bool compare_lte(struct ast_node* lh, struct ast_node* rh)
     return res;
 }
 
-bool compare_gte(struct ast_node* lh, struct ast_node* rh)
+bool compare_gte(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
@@ -541,33 +507,48 @@ bool compare_gte(struct ast_node* lh, struct ast_node* rh)
     return res;
 }
 
-bool compare_and(struct ast_node* lh, struct ast_node* rh)
+bool compare_and(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
 }
 
-bool compare_or(struct ast_node* lh, struct ast_node* rh)
+bool compare_or(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     return (*lh).data.d_literal.value_bool || (*rh).data.d_literal.value_bool;
 }
 
-bool compare_eq(struct ast_node* lh, struct ast_node* rh)
+bool compare_eq(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
-    ZVAL_STRING(&a, (*lh).data.d_literal.value);
-    ZVAL_STRING(&b, (*rh).data.d_literal.value);
+    zval * a_ptr = &a;
+    zval * b_ptr = &b;
 
-    compare_function(&result, &a, &b);
-    zval_ptr_dtor(&a);
-    zval_ptr_dtor(&b);
+    if (lh->type == AST_SELECTOR) {
+        a_ptr = resolvePropertySelectorValue(arr, lh);
+    } else {
+        ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    }
+
+    if (rh->type == AST_SELECTOR) {
+        b_ptr = resolvePropertySelectorValue(arr, rh);
+    } else {
+        ZVAL_STRING(&b, (*rh).data.d_literal.value);
+    }
+
+    // PHPWRITE(Z_STRVAL_P(a_ptr), Z_STRLEN_P(a_ptr));
+    // PHPWRITE(Z_STRVAL_P(b_ptr), Z_STRLEN_P(b_ptr));
+
+    compare_function(&result, a_ptr, b_ptr);
+    zval_ptr_dtor(a_ptr);
+    zval_ptr_dtor(b_ptr);
 
     bool res = (Z_LVAL(result) == 0);
 
     return res;
 }
 
-bool compare_neq(struct ast_node* lh, struct ast_node* rh)
+bool compare_neq(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
@@ -583,12 +564,12 @@ bool compare_neq(struct ast_node* lh, struct ast_node* rh)
     return res;
 }
 
-bool compare_isset(struct ast_node* lh, struct ast_node* rh)
+bool compare_isset(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
 }
 
-bool compare_rgxp(struct ast_node* lh, struct ast_node* rh)
+bool compare_rgxp(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval pattern;
     pcre_cache_entry* pce;

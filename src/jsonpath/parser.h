@@ -70,22 +70,22 @@ typedef struct {
     char msg[PARSE_BUF_LEN];
 } parse_error;
 
-typedef bool(*compare_cb) (struct ast_node*, struct ast_node*);
+typedef bool(*compare_cb) (zval*, struct ast_node*, struct ast_node*);
 
 bool evaluate_postfix_expression(zval* arr, struct ast_node* tok);
 compare_cb exec_cb_by_token(enum ast_type);
 operator_type get_token_type(enum ast_type);
 
-bool compare_lt(struct ast_node* lh, struct ast_node* rh);
-bool compare_lte(struct ast_node* lh, struct ast_node* rh);
-bool compare_gt(struct ast_node* lh, struct ast_node* rh);
-bool compare_gte(struct ast_node* lh, struct ast_node* rh);
-bool compare_and(struct ast_node* lh, struct ast_node* rh);
-bool compare_or(struct ast_node* lh, struct ast_node* rh);
-bool compare_eq(struct ast_node* lh, struct ast_node* rh);
-bool compare_neq(struct ast_node* lh, struct ast_node* rh);
-bool compare_isset(struct ast_node* lh, struct ast_node* rh);	// lh = rh
-bool compare_rgxp(struct ast_node* lh, struct ast_node* rh);
+bool compare_lt(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_lte(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_gt(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_gte(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_and(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_or(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_eq(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_neq(zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool compare_isset(zval* arr, struct ast_node* lh, struct ast_node* rh);	// lh = rh
+bool compare_rgxp(zval* arr, struct ast_node* lh, struct ast_node* rh);
 
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],

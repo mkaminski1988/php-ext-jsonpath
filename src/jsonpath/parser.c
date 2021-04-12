@@ -388,13 +388,14 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 	struct ast_node op_false;
 
 	op_false.type = AST_BOOL;
-	op_true.data.d_literal.value_bool = false;
+	op_false.data.d_literal.value_bool = false;
 
 	while (tok != NULL) {
-
+		printf("LOOPING\n");
 		if (tok->type == AST_EXPR_END) {
 			break;
 		} else if (tok->next == NULL) {
+			break;
 			// TODO error about missing expression end
 		}
 
@@ -413,10 +414,12 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 
 			stack_pop(&s);
 
-			if (exec_cb_by_token(tok->type) (expr_lh, expr_rh)) {
+			if (exec_cb_by_token(tok->type) (arr, expr_lh, expr_rh)) {
+				printf("PUSH TRUE\n");
 				stack_push(&s, &op_true);
 			}
 			else {
+				printf("PUSH FALSE\n");
 				stack_push(&s, &op_false);
 			}
 
@@ -431,8 +434,8 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 
 
 	expr_lh = stack_top(&s);
-
-	return expr_lh->data.d_literal.value_bool;
+	return true;
+	// return expr_lh->data.d_literal.value_bool;
 }
 
 compare_cb exec_cb_by_token(enum ast_type type)
