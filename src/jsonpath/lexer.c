@@ -260,8 +260,6 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 		(*p)++;
 	}
 
-	// printf("Lex: %s\n", visible[found_token]);
-
 	return found_token;
 }
 

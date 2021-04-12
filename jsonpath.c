@@ -71,7 +71,7 @@ PHP_METHOD(JsonPath, find)
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
-    print_ast(head.next);
+    // print_ast(head.next);
 
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
@@ -363,22 +363,9 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
 
     // struct ast_node* ptr;
 
-    if (evaluate_postfix_expression(arr, tok->next)) {
-        printf("IS CONDITIONAL");
-        if (tok->next == NULL) {
-            printf("IS NULL");
-            copyToReturnResult(data, return_value);
-        }
-        else {
-            printf("IS NOT NULL");
-            evaluateAST(data, tok->next, return_value);
-        }
-    } else {
-        printf("IS FALSE");
-    }
+    ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
 
-    // ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
-
+        // PHPWRITE(Z_STRVAL_P(data), Z_STRLEN_P(data));
         // ptr = tok;
 
         // // For each array entry, find the node names and populate their values
@@ -393,18 +380,11 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
         //     ptr = ptr->next;
         // }
 
-
-        // ptr = tok;
-
-        // // Clean up node values to prevent incorrect node values during recursive wildcard iterations
-        // while (ptr != NULL) {
-        //     if (ptr->type == AST_SELECTOR) {
-        //         ptr->data.d_selector.value[0] = '\0';
-        //     }
-        //     ptr = ptr->next;
-        // }
-    // }
-    // ZEND_HASH_FOREACH_END();
+        if (evaluate_postfix_expression(data, tok->next)) {
+            copyToReturnResult(data, return_value);
+        }
+    }
+    ZEND_HASH_FOREACH_END();
 }
 
 /* populate the expression operator with the array value that */
