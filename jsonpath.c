@@ -71,7 +71,7 @@ PHP_METHOD(JsonPath, find)
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
-    print_ast(head.next);
+    // print_ast(head.next);
 
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
@@ -171,8 +171,8 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
             execWildcard(arr, tok, return_value);
             return;
         case AST_EXPR_START:
+            // executeExpression(arr, tok, return_value);
             tok = tok->next;
-            executeExpression(arr, tok, return_value);
             break;
         case AST_EXPR_END:
             tok = tok->next;
@@ -551,9 +551,6 @@ bool compare_or(struct ast_node* lh, struct ast_node* rh)
 
 bool compare_eq(struct ast_node* lh, struct ast_node* rh)
 {
-
-    printf("%s == %s ?", lh->type_s, rh->type_s);
-
     zval a, b, result;
 
     ZVAL_STRING(&a, (*lh).data.d_literal.value);

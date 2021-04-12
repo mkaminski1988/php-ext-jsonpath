@@ -134,8 +134,6 @@ bool build_parse_tree(
 
 	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
 
-		printf("build_parse_tree %s\n", visible[lex_tok[*lex_idx]]);
-
 		switch (lex_tok[*lex_idx]) {
 		case LEX_WILD_CARD:
 			// todo : create a macro here
@@ -163,7 +161,6 @@ bool build_parse_tree(
 				cur->data.d_selector.child_scope = false;
 			}
 			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
-			printf("\tval: %s\n", cur->data.d_selector.value);
 			break;
 		case LEX_FILTER_START:
 			if (lex_tok[(*lex_idx)+1] == LEX_LITERAL || lex_tok[(*lex_idx)+1] == LEX_SLICE) {
@@ -366,8 +363,6 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 
 	while (tok != NULL) {
 
-		printf("evaluate_postfix_expression::%s\n", tok->type_s);
-
 		if (tok->type == AST_EXPR_END) {
 			break;
 		} else if (tok->next == NULL) {
@@ -453,7 +448,6 @@ bool is_unary(enum ast_type type)
 //TODO: Distinguish between operator and token?
 int get_operator_precedence(struct ast_node* tok)
 {
-	printf("op precedence: %s", tok->type_s);
 	switch (tok->type) {
 	case AST_ISSET:
 		return 10000;
