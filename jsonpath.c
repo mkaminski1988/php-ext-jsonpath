@@ -147,9 +147,6 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
 {
     while (tok != NULL) {
-
-        // printf("evaluateAST Type: %s\n", ast_str[tok->type]);
-
         switch (tok->type) {
         case AST_INDEX_LIST:
             executeIndexFilter(arr, tok, return_value);
@@ -190,12 +187,6 @@ void copyToReturnResult(zval* arr, zval* return_value)
 
 struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy)
 {
-    // for (int i = 0; i < xy; i++) {
-    //     printf("\t");
-    // }
-
-    // printf("execSelectorChain Type: %s Value: %s\n", ast_str[tok->type], tok->data.d_selector.value);
-
     if (Z_TYPE_P(arr) != IS_ARRAY) {
         return NULL;
     }
@@ -233,11 +224,6 @@ void execWildcard(zval* arr, struct ast_node* tok, zval* return_value)
 
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy)
 {
-    // for (int i = 0; i < xy; i++) {
-    //     printf("\t");
-    // }
-    // printf("execRecursiveArrayWalk Type: %s Value: %s\n", ast_str[tok->type], tok->data.d_selector.value);
-
     if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
         return;
     }
@@ -357,25 +343,7 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
     zend_string* key;
     zval* data;
 
-    // struct ast_node* ptr;
-
     ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
-
-        // PHPWRITE(Z_STRVAL_P(data), Z_STRLEN_P(data));
-        // ptr = tok;
-
-        // // For each array entry, find the node names and populate their values
-        // // Fill up expression NODE_NAME VALS
-        // while (ptr != NULL) {
-        //     if (ptr->next != NULL && ptr->next->type == AST_ISSET) {
-        //         resolveIssetSelector(data, ptr);
-        //     }
-        //     else if (ptr->type == AST_SELECTOR) {
-        //         resolvePropertySelectorValue(data, ptr);
-        //     }
-        //     ptr = ptr->next;
-        // }
-
         if (evaluate_postfix_expression(data, tok->data.d_expression.head)) {
             if (tok->next == NULL) {
                 copyToReturnResult(data, return_value);
@@ -424,81 +392,7 @@ void resolveIssetSelector(zval* arr, struct ast_node* node)
     // }
 }
 
-bool compare_lt(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    zval a, b, result;
-
-    ZVAL_STRING(&a, (*lh).data.d_literal.value);
-    ZVAL_STRING(&b, (*rh).data.d_literal.value);
-
-    compare_function(&result, &a, &b);
-    zval_ptr_dtor(&a);
-    zval_ptr_dtor(&b);
-
-    bool res = (Z_LVAL(result) < 0);
-
-    return res;
-}
-
-bool compare_gt(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    zval a, b, result;
-
-    ZVAL_STRING(&a, (*lh).data.d_literal.value);
-    ZVAL_STRING(&b, (*rh).data.d_literal.value);
-
-    compare_function(&result, &a, &b);
-    zval_ptr_dtor(&a);
-    zval_ptr_dtor(&b);
-
-    bool res = (Z_LVAL(result) > 0);
-
-    return res;
-}
-
-bool compare_lte(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    zval a, b, result;
-
-    ZVAL_STRING(&a, (*lh).data.d_literal.value);
-    ZVAL_STRING(&b, (*rh).data.d_literal.value);
-
-    compare_function(&result, &a, &b);
-    zval_ptr_dtor(&a);
-    zval_ptr_dtor(&b);
-
-    bool res = (Z_LVAL(result) <= 0);
-
-    return res;
-}
-
-bool compare_gte(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    zval a, b, result;
-
-    ZVAL_STRING(&a, (*lh).data.d_literal.value);
-    ZVAL_STRING(&b, (*rh).data.d_literal.value);
-
-    compare_function(&result, &a, &b);
-    zval_ptr_dtor(&a);
-    zval_ptr_dtor(&b);
-
-    bool res = (Z_LVAL(result) >= 0);
-
-    return res;
-}
-
-bool compare_and(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
-}
-
-bool compare_or(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return (*lh).data.d_literal.value_bool || (*rh).data.d_literal.value_bool;
-}
-
-bool compare_eq(zval* arr, struct ast_node* lh, struct ast_node* rh)
+long compare(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
     zval a, b, result;
 
@@ -524,25 +418,47 @@ bool compare_eq(zval* arr, struct ast_node* lh, struct ast_node* rh)
     zval_ptr_dtor(a_ptr);
     zval_ptr_dtor(b_ptr);
 
-    bool res = (Z_LVAL(result) == 0);
+    return Z_LVAL(result);
+}
 
-    return res;
+bool compare_lt(zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    return compare(arr, lh, rh) < 0;
+}
+
+bool compare_gt(zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    return compare(arr, lh, rh) > 0;
+}
+
+bool compare_lte(zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    return compare(arr, lh, rh) <= 0;
+}
+
+bool compare_gte(zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    return compare(arr, lh, rh) >= 0;
+}
+
+bool compare_and(zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
+}
+
+bool compare_or(zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    return (*lh).data.d_literal.value_bool || (*rh).data.d_literal.value_bool;
+}
+
+bool compare_eq(zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    return compare(arr, lh, rh) == 0;
 }
 
 bool compare_neq(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
-    zval a, b, result;
-
-    ZVAL_STRING(&a, (*lh).data.d_literal.value);
-    ZVAL_STRING(&b, (*rh).data.d_literal.value);
-
-    compare_function(&result, &a, &b);
-    zval_ptr_dtor(&a);
-    zval_ptr_dtor(&b);
-
-    bool res = (Z_LVAL(result) != 0);
-
-    return res;
+    return compare(arr, lh, rh) != 0;
 }
 
 bool compare_isset(zval* arr, struct ast_node* lh, struct ast_node* rh)
@@ -552,31 +468,43 @@ bool compare_isset(zval* arr, struct ast_node* lh, struct ast_node* rh)
 
 bool compare_rgxp(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
-    zval pattern;
-    pcre_cache_entry* pce;
+    // /* obtain the string that will get regexed */
 
-    ZVAL_STRING(&pattern, (*rh).data.d_literal.value);
+    // zval* s_lh_ptr = resolvePropertySelectorValue(arr, lh);
 
-    if ((pce = pcre_get_compiled_regex_cache(Z_STR(pattern))) == NULL) {
-        zval_ptr_dtor(&pattern);
-        return false;
-    }
+    // printf("\nTarget: %s\n", Z_STRVAL_P(s_lh_ptr));
 
-    zval retval;
-    zval subpats;
+    // /* obtain and compile the regex expression */
 
-    ZVAL_NULL(&retval);
-    ZVAL_NULL(&subpats);
+    // pcre_cache_entry* pce;
 
-    zend_string* s_lh = zend_string_init((*lh).data.d_literal.value, strlen((*lh).data.d_literal.value), 0);
+    // zend_string* pattern = zend_string_init((*rh).data.d_literal.value, strlen((*rh).data.d_literal.value), 0);
 
-    php_pcre_match_impl(pce, s_lh, &retval, &subpats, 0, 0, 0, 0);
 
-    zend_string_release_ex(s_lh, 0);
-    zval_ptr_dtor(&subpats);
-    zval_ptr_dtor(&pattern);
+    // if ((pce = pcre_get_compiled_regex_cache(pattern)) == NULL) {
+    //     zval_ptr_dtor(&pattern);
+    //     return false;
+    // }
 
-    return Z_LVAL(retval) > 0;
+    // /* execute the regex expression */
+
+    // zval retval;
+    // zval subpats;
+
+    // ZVAL_NULL(&retval);
+    // ZVAL_NULL(&subpats);
+
+    // zend_string *new_str = zend_string_init(ZSTR_VAL_P(s_lh_ptr), ZSTR_LEN_P(s_lh_ptr), 0);
+
+    // php_pcre_match_impl(pce, new_str, &retval, &subpats, 0, 0, 0, 0);
+
+    // zval_ptr_dtor(&subpats);
+    // zval_ptr_dtor(&pattern);
+
+    // // printf("Result: %ld\n", Z_LVAL(retval));
+
+    // return Z_LVAL(retval) > 0;
+    return false;
 }
 
 bool is_scalar(zval* arg)

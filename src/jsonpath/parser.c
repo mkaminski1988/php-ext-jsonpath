@@ -158,7 +158,6 @@ bool build_parse_tree(
 ) {
 
 	struct ast_node* cur = head;
-	struct ast_node* cur_expr_start = NULL;
 
 	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
 
@@ -283,6 +282,8 @@ bool build_parse_tree(
 			(*lex_idx)++;
 
 			/** allocate dummy head.. **/
+			/* I don't really love allocating a dummy head node, maybe we can do better */
+			/* TODO: free dummy head node */
 			cur = ast_alloc_node(cur, AST_EXPR);
 			cur->data.d_expression.head = emalloc(sizeof(struct ast_node));
 
