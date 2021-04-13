@@ -18,8 +18,7 @@ enum ast_type {
     AST_AND,
     AST_BOOL,
     AST_EQ,
-    AST_EXPR_END,
-    AST_EXPR_START,
+    AST_EXPR,
     AST_GT,
     AST_GTE,
     AST_INDEX_LIST,
@@ -57,7 +56,7 @@ union ast_node_data {
         bool value_bool;
     } d_literal;
     struct {
-        struct ast_node* node;
+        struct ast_node* head;
     } d_expression;
 };
 

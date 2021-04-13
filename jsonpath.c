@@ -172,13 +172,9 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
         case AST_WILD_CARD:
             execWildcard(arr, tok, return_value);
             return;
-        case AST_EXPR_START:
+        case AST_EXPR:
             executeExpression(arr, tok, return_value);
             tok = tok->next;
-            break;
-        case AST_EXPR_END:
-            tok = tok->next;
-            // noop
             break;
         }
     }
@@ -380,8 +376,13 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
         //     ptr = ptr->next;
         // }
 
-        if (evaluate_postfix_expression(data, tok->next)) {
-            copyToReturnResult(data, return_value);
+        if (evaluate_postfix_expression(data, tok->data.d_expression.head)) {
+            if (tok->next == NULL) {
+                copyToReturnResult(data, return_value);
+            }
+            else {
+                evaluateAST(data, tok->next, return_value);
+            }
         }
     }
     ZEND_HASH_FOREACH_END();

@@ -12,8 +12,7 @@ const char* ast_str[] = {
     "AST_AND",
     "AST_BOOL",
     "AST_EQ",
-    "AST_EXPR_END",
-    "AST_EXPR_START",
+    "AST_EXPR",
     "AST_GT",
     "AST_GTE",
     "AST_INDEX_LIST",
@@ -62,9 +61,6 @@ void print_ast(struct ast_node* head)
 			printf("\t\t• %s\n", head->data.d_literal.value_bool);
 			break;
 		}
-		if (head->type == AST_EXPR_END) {
-			break;
-		}
 		head = head->next;
 	}
 	printf("--------------------------------\n");
@@ -75,11 +71,11 @@ void convert_to_postfix(struct ast_node* expr_start)
 {
 	stack s;
 	stack_init(&s);
-	struct ast_node* cur = expr_start->next; /* after AST_AST_START */
+	struct ast_node* cur = expr_start->next;
 	struct ast_node* tmp;
 	struct ast_node* pfix = expr_start;
 
-	while (cur->type != AST_EXPR_END) {
+	while (cur != NULL) {
 
 		switch (get_token_type(cur->type)) {
 		case TYPE_OPERAND:
@@ -223,10 +219,6 @@ bool build_parse_tree(
 			(*lex_idx)++;
 
 			break;
-		case LEX_EXPR_START:
-			cur = ast_alloc_node(cur, AST_EXPR_START);
-			cur_expr_start = cur;
-			break;
 		case LEX_PAREN_OPEN:
 			cur = ast_alloc_node(cur, AST_PAREN_LEFT);
 			break;
@@ -287,11 +279,23 @@ bool build_parse_tree(
 		case LEX_RGXP:
 			cur = ast_alloc_node(cur, AST_RGXP);
 			break;
-		case LEX_EXPR_END:
-			cur = ast_alloc_node(cur, AST_EXPR_END);
-			convert_to_postfix(cur_expr_start);
-			cur_expr_start = NULL;
+		case LEX_EXPR_START:
+			(*lex_idx)++;
+
+			/** allocate dummy head.. **/
+			cur = ast_alloc_node(cur, AST_EXPR);
+			cur->data.d_expression.head = emalloc(sizeof(struct ast_node));
+
+			build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_expression.head, err);
+
+			convert_to_postfix(cur->data.d_expression.head);
+
+			/* trim dummy head */
+			cur->data.d_expression.head = cur->data.d_expression.head->next;
 			break;
+		case LEX_EXPR_END:
+			/* return call initiated by LEX_EXPR_START */
+			return true;
 		default:
 			// printf("build_parse_tree: default\n");
 			break;
@@ -365,7 +369,6 @@ operator_type get_token_type(enum ast_type type)
 	case AST_AND:
 	case AST_ISSET:
 	case AST_RGXP:
-	case AST_EXPR_END:
 		return TYPE_OPERATOR;
 	case AST_PAREN_LEFT:
 	case AST_PAREN_RIGHT:
@@ -398,14 +401,6 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 	op_false.data.d_literal.value_bool = false;
 
 	while (tok != NULL) {
-
-		if (tok->type == AST_EXPR_END) {
-			break;
-		} else if (tok->next == NULL) {
-			break;
-			// TODO error about missing expression end
-		}
-
 		switch (get_token_type(tok->type)) {
 		case TYPE_OPERATOR:
 
