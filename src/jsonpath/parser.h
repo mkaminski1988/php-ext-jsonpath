@@ -36,7 +36,8 @@ enum ast_type {
     AST_RGXP,
     AST_ROOT,
     AST_SELECTOR,
-    AST_WILD_CARD
+    AST_WILD_CARD,
+    AST_HEAD
 };
 
 extern const char* ast_str[];

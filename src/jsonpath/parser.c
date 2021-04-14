@@ -30,7 +30,8 @@ const char* ast_str[] = {
     "AST_RGXP",
     "AST_ROOT",
     "AST_SELECTOR",
-    "AST_WILD_CARD"
+    "AST_WILD_CARD",
+	"AST_HEAD"
 };
 
 struct ast_node* ast_alloc_node(struct ast_node* prev, enum ast_type type)
@@ -44,30 +45,48 @@ struct ast_node* ast_alloc_node(struct ast_node* prev, enum ast_type type)
 	return next;
 }
 
-void print_ast(struct ast_node* head)
+void print_ast(struct ast_node* head, int level)
 {
-	printf("--------------------------------\n");
-	printf("AST Structure\n\n");
+	if (level == 0) {
+		printf("--------------------------------\n");
+		printf("AST Structure\n\n");
+		print_ast(head, level+1);
+		return;
+	}
+
+	struct ast_node* ptr;
+
 	while (head != NULL) {
-		printf("\t➔ %s\n", ast_str[head->type]);
+		for (int i = 0; i < level; i++)
+			printf("\t");
+		printf("➔ %s\n", ast_str[head->type]);
 		switch (head->type) {
+		case AST_EXPR:
+			ptr = head->data.d_expression.head;
+			print_ast(ptr, level+1);
+			break;
 		case AST_SELECTOR:
-			printf("\t\t• %s\n", head->data.d_selector.value);
+			for (int i = 0; i < level+1; i++)
+				printf("\t");
+			printf("• %s\n", head->data.d_selector.value);
 			break;
 		case AST_LITERAL:
-			printf("\t\t• %s\n", head->data.d_literal.value);
+			for (int i = 0; i < level+1; i++)
+				printf("\t");
+			printf("• %s\n", head->data.d_literal.value);
 			break;
 		case AST_LITERAL_BOOL:
-			printf("\t\t• %s\n", head->data.d_literal.value_bool);
+			for (int i = 0; i < level+1; i++)
+				printf("\t");
+			printf("• %s\n", head->data.d_literal.value_bool);
 			break;
 		}
 		head = head->next;
 	}
-	printf("--------------------------------\n");
 }
 
 // See http://csis.pace.edu/~wolf/CS122/infix-postfix.htm
-void convert_to_postfix(struct ast_node* expr_start)
+bool convert_to_postfix(struct ast_node* expr_start)
 {
 	stack s;
 	stack_init(&s);
@@ -82,8 +101,19 @@ void convert_to_postfix(struct ast_node* expr_start)
 			pfix->next = cur;
 			pfix = pfix->next;
 			cur = cur->next;
+			if (cur->type == AST_SELECTOR) {
+				/* TODO hack for now, place under value */
+				while (cur != NULL && cur->type == AST_SELECTOR) {
+					pfix->next = cur;
+					pfix = pfix->next;
+					cur = cur->next;
+				}
+			}
 			break;
 		case TYPE_OPERATOR:
+			// TODO check missing operand on RHS
+			// if cur == NULL || (cur->next == NULL && !is_unary(cur->type)) {
+			// }
 			if (!s.size || stack_top(&s)->type == AST_PAREN_LEFT) {
 				stack_push(&s, cur);
 				cur = cur->next;
@@ -286,10 +316,12 @@ bool build_parse_tree(
 			/* TODO: free dummy head node */
 			cur = ast_alloc_node(cur, AST_EXPR);
 			cur->data.d_expression.head = emalloc(sizeof(struct ast_node));
+			cur->data.d_expression.head->type = AST_HEAD;
 
 			build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_expression.head, err);
-
+			print_ast(cur, 0);
 			convert_to_postfix(cur->data.d_expression.head);
+			print_ast(cur, 0);
 
 			/* trim dummy head */
 			cur->data.d_expression.head = cur->data.d_expression.head->next;
@@ -407,26 +439,39 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 
 			if (!is_unary(tok->type)) {
 				expr_rh = stack_top(&s);
+				printf("evaluate_postfix_expression::pop non-unary %s\n", ast_str[expr_rh->type]);
 				stack_pop(&s);
 				expr_lh = stack_top(&s);
+				printf("evaluate_postfix_expression::pop non-unary %s\n", ast_str[expr_lh->type]);
 			}
 			else {
 				expr_rh = stack_top(&s);
 				expr_lh = expr_rh;
+				printf("evaluate_postfix_expression::pop unary %s\n", ast_str[expr_rh->type]);
 			}
 
 			stack_pop(&s);
 
 			if (exec_cb_by_token(tok->type) (arr, expr_lh, expr_rh)) {
+				printf("evaluate_postfix_expression::push true\n");
 				stack_push(&s, &op_true);
 			}
 			else {
+				printf("evaluate_postfix_expression::push false\n");
 				stack_push(&s, &op_false);
 			}
 
 			break;
 		case TYPE_OPERAND:
+			printf("evaluate_postfix_expression::push %s\n", ast_str[tok->type]);
 			stack_push(&s, tok);
+			if (tok->type == AST_SELECTOR) {
+				while (tok->next != NULL && tok->next->type == AST_SELECTOR) {
+					printf("LOOP...\n");
+					/* skip putting following selectors on stack */
+					tok = tok->next;
+				}
+			}
 			break;
 		}
 
