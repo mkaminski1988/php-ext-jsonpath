@@ -37,9 +37,9 @@ const char* ast_str[] = {
 struct ast_node* ast_alloc_node(struct ast_node* prev, enum ast_type type)
 {
 	struct ast_node* next = emalloc(sizeof(struct ast_node));
-	next->next = NULL;
-	next->type = type;
+	memset(next, 0, sizeof(struct ast_node));
 
+	next->type = type;
 	prev->next = next;
 
 	return next;
@@ -170,8 +170,6 @@ bool convert_to_postfix(struct ast_node* expr_start)
 		tmp = stack_top(&s);
 		pfix->next = tmp;
 		pfix = pfix->next;
-		printf("end stack_pop::%s\n", ast_str[pfix->type]);
-		printf("append::%s\n", ast_str[pfix->type]);
 		stack_pop(&s);
 	}
 
@@ -319,9 +317,9 @@ bool build_parse_tree(
 			cur->data.d_expression.head->type = AST_HEAD;
 
 			build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_expression.head, err);
-			print_ast(cur, 0);
+			// print_ast(cur, 0);
 			convert_to_postfix(cur->data.d_expression.head);
-			print_ast(cur, 0);
+			// print_ast(cur, 0);
 
 			/* trim dummy head */
 			cur->data.d_expression.head = cur->data.d_expression.head->next;
@@ -379,7 +377,6 @@ void parse_filter_list(
 			}
 		}
 		else if (lex_tok[*lex_idx] == LEX_LITERAL) {
-			// printf("parseList: got a literal %s\n", lex_tok_values[*lex_idx]);
 			tok->data.d_list.indexes[tok->data.d_list.count] = atoi(lex_tok_values[*lex_idx]);
 			tok->data.d_list.count++;
 		} else {
@@ -439,35 +436,29 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 
 			if (!is_unary(tok->type)) {
 				expr_rh = stack_top(&s);
-				printf("evaluate_postfix_expression::pop non-unary %s\n", ast_str[expr_rh->type]);
 				stack_pop(&s);
 				expr_lh = stack_top(&s);
-				printf("evaluate_postfix_expression::pop non-unary %s\n", ast_str[expr_lh->type]);
 			}
 			else {
 				expr_rh = stack_top(&s);
 				expr_lh = expr_rh;
-				printf("evaluate_postfix_expression::pop unary %s\n", ast_str[expr_rh->type]);
 			}
 
 			stack_pop(&s);
 
 			if (exec_cb_by_token(tok->type) (arr, expr_lh, expr_rh)) {
-				printf("evaluate_postfix_expression::push true\n");
 				stack_push(&s, &op_true);
 			}
 			else {
-				printf("evaluate_postfix_expression::push false\n");
 				stack_push(&s, &op_false);
 			}
 
 			break;
 		case TYPE_OPERAND:
-			printf("evaluate_postfix_expression::push %s\n", ast_str[tok->type]);
 			stack_push(&s, tok);
+			/* TODO hack for now, place under value */
 			if (tok->type == AST_SELECTOR) {
 				while (tok->next != NULL && tok->next->type == AST_SELECTOR) {
-					printf("LOOP...\n");
 					/* skip putting following selectors on stack */
 					tok = tok->next;
 				}

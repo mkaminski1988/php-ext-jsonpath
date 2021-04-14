@@ -71,7 +71,7 @@ PHP_METHOD(JsonPath, find)
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
-    print_ast(head.next, 0);
+    // print_ast(head.next, 0);
 
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
@@ -118,7 +118,7 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
             return false;
         }
 
-        printf("\t➔ %s\n", visible[cur_tok]);
+        // printf("\t➔ %s\n", visible[cur_tok]);
 
         switch (cur_tok) {
         case LEX_NODE:
@@ -411,9 +411,11 @@ long compare(zval* arr, struct ast_node* lh, struct ast_node* rh)
         ZVAL_STRING(&b, (*rh).data.d_literal.value);
     }
 
-    printf("compare [lh] type: %s [rh] type: %s\n", ast_str[lh->type], ast_str[rh->type]);
+    // printf("compare [lh] type: %s [rh] type: %s\n", ast_str[lh->type], ast_str[rh->type]);
     // PHPWRITE(Z_STRVAL_P(a_ptr), Z_STRLEN_P(a_ptr));
     // PHPWRITE(Z_STRVAL_P(b_ptr), Z_STRLEN_P(b_ptr));
+
+    // todo what if a_ptr or b_ptr are null?
 
     compare_function(&result, a_ptr, b_ptr);
     zval_ptr_dtor(a_ptr);
@@ -454,9 +456,7 @@ bool compare_or(zval* arr, struct ast_node* lh, struct ast_node* rh)
 
 bool compare_eq(zval* arr, struct ast_node* lh, struct ast_node* rh)
 {
-    bool ret = compare(arr, lh, rh) == 0;
-    printf("compare_eq return %d", ret);
-    return ret;
+    return compare(arr, lh, rh) == 0;
 }
 
 bool compare_neq(zval* arr, struct ast_node* lh, struct ast_node* rh)
