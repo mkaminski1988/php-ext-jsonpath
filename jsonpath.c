@@ -392,46 +392,6 @@ void resolveIssetSelector(zval* arr, struct ast_node* node)
     // }
 }
 
-bool compare_rgxp(zval* lh, zval* rh)
-{
-    // /* obtain the string that will get regexed */
-
-    // zval* s_lh_ptr = resolvePropertySelectorValue(arr, lh);
-
-    // printf("\nTarget: %s\n", Z_STRVAL_P(s_lh_ptr));
-
-    // /* obtain and compile the regex expression */
-
-    // pcre_cache_entry* pce;
-
-    // zend_string* pattern = zend_string_init((*rh).data.d_literal.value, strlen((*rh).data.d_literal.value), 0);
-
-
-    // if ((pce = pcre_get_compiled_regex_cache(pattern)) == NULL) {
-    //     zval_ptr_dtor(&pattern);
-    //     return false;
-    // }
-
-    // /* execute the regex expression */
-
-    // zval retval;
-    // zval subpats;
-
-    // ZVAL_NULL(&retval);
-    // ZVAL_NULL(&subpats);
-
-    // zend_string *new_str = zend_string_init(ZSTR_VAL_P(s_lh_ptr), ZSTR_LEN_P(s_lh_ptr), 0);
-
-    // php_pcre_match_impl(pce, new_str, &retval, &subpats, 0, 0, 0, 0);
-
-    // zval_ptr_dtor(&subpats);
-    // zval_ptr_dtor(&pattern);
-
-    // // printf("Result: %ld\n", Z_LVAL(retval));
-
-    // return Z_LVAL(retval) > 0;
-    return false;
-}
 
 int compare(zval* lh, zval* rh)
 {
@@ -440,6 +400,32 @@ int compare(zval* lh, zval* rh)
 
     compare_function(&result, lh, rh);
     return (int) Z_LVAL(result);
+}
+
+bool compare_rgxp(zval* lh, zval* rh)
+{
+    zval pattern;
+    pcre_cache_entry* pce;
+
+    if ((pce = pcre_get_compiled_regex_cache(Z_STR_P(rh))) == NULL) {
+        zval_ptr_dtor(rh);
+        return false;
+    }
+
+    zval retval;
+    zval subpats;
+
+    ZVAL_NULL(&retval);
+    ZVAL_NULL(&subpats);
+
+    zend_string* s_lh = zend_string_copy(Z_STR_P(lh));
+
+    php_pcre_match_impl(pce, s_lh, &retval, &subpats, 0, 0, 0, 0);
+
+    zend_string_release_ex(s_lh, 0);
+    zval_ptr_dtor(&subpats);
+
+    return Z_LVAL(retval) > 0;
 }
 
 bool execute_operator_callback(enum ast_type type, zval* arr, struct ast_node* lh, struct ast_node* rh)
@@ -498,9 +484,8 @@ bool execute_operator_callback(enum ast_type type, zval* arr, struct ast_node* l
 		ret = lh->data.d_literal.value_bool && rh->data.d_literal.value_bool;
         break;
 	case AST_RGXP:
-		ret = false;
+		ret = compare_rgxp(a_ptr, b_ptr);
         break;
-		// return compare_rgxp;
 	}
 
     zval_ptr_dtor(a_ptr);
