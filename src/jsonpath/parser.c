@@ -446,7 +446,7 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 
 			stack_pop(&s);
 
-			if (exec_cb_by_token(tok->type) (arr, expr_lh, expr_rh)) {
+			if (execute_operator_callback(tok->type, arr, expr_lh, expr_rh)) {
 				stack_push(&s, &op_true);
 			}
 			else {
@@ -473,40 +473,6 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 	expr_lh = stack_top(&s);
 
 	return expr_lh->data.d_literal.value_bool;
-}
-
-compare_cb exec_cb_by_token(enum ast_type type)
-{
-	switch (type) {
-	case AST_EQ:
-		return compare_eq;
-	case AST_NE:
-		return compare_neq;
-	case AST_LT:
-		return compare_lt;
-	case AST_LTE:
-		return compare_lte;
-	case AST_GT:
-		return compare_gt;
-	case AST_GTE:
-		return compare_gte;
-	case AST_ISSET:
-		return compare_isset;
-	case AST_OR:
-		return compare_or;
-	case AST_AND:
-		return compare_and;
-	case AST_RGXP:
-		return compare_rgxp;
-	case AST_PAREN_LEFT:
-	case AST_PAREN_RIGHT:
-	case AST_LITERAL:
-	case AST_LITERAL_BOOL:
-	case AST_BOOL:
-	default:
-		printf("Error, no callback for token");
-		break;
-	}
 }
 
 bool is_unary(enum ast_type type)

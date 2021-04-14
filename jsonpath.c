@@ -392,84 +392,7 @@ void resolveIssetSelector(zval* arr, struct ast_node* node)
     // }
 }
 
-long compare(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    zval a, b, result;
-
-    zval * a_ptr = &a;
-    zval * b_ptr = &b;
-
-    if (lh->type == AST_SELECTOR) {
-        a_ptr = resolvePropertySelectorValue(arr, lh);
-    } else {
-        ZVAL_STRING(&a, (*lh).data.d_literal.value);
-    }
-
-    if (rh->type == AST_SELECTOR) {
-        b_ptr = resolvePropertySelectorValue(arr, rh);
-    } else {
-        ZVAL_STRING(&b, (*rh).data.d_literal.value);
-    }
-
-    // printf("compare [lh] type: %s [rh] type: %s\n", ast_str[lh->type], ast_str[rh->type]);
-    // PHPWRITE(Z_STRVAL_P(a_ptr), Z_STRLEN_P(a_ptr));
-    // PHPWRITE(Z_STRVAL_P(b_ptr), Z_STRLEN_P(b_ptr));
-
-    // todo what if a_ptr or b_ptr are null?
-
-    compare_function(&result, a_ptr, b_ptr);
-    zval_ptr_dtor(a_ptr);
-    zval_ptr_dtor(b_ptr);
-
-    return Z_LVAL(result);
-}
-
-bool compare_lt(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return compare(arr, lh, rh) < 0;
-}
-
-bool compare_gt(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return compare(arr, lh, rh) > 0;
-}
-
-bool compare_lte(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return compare(arr, lh, rh) <= 0;
-}
-
-bool compare_gte(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return compare(arr, lh, rh) >= 0;
-}
-
-bool compare_and(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
-}
-
-bool compare_or(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return (*lh).data.d_literal.value_bool || (*rh).data.d_literal.value_bool;
-}
-
-bool compare_eq(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return compare(arr, lh, rh) == 0;
-}
-
-bool compare_neq(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return compare(arr, lh, rh) != 0;
-}
-
-bool compare_isset(zval* arr, struct ast_node* lh, struct ast_node* rh)
-{
-    return (*lh).data.d_literal.value_bool && (*rh).data.d_literal.value_bool;
-}
-
-bool compare_rgxp(zval* arr, struct ast_node* lh, struct ast_node* rh)
+bool compare_rgxp(zval* lh, zval* rh)
 {
     // /* obtain the string that will get regexed */
 
@@ -508,6 +431,82 @@ bool compare_rgxp(zval* arr, struct ast_node* lh, struct ast_node* rh)
 
     // return Z_LVAL(retval) > 0;
     return false;
+}
+
+int compare(zval* lh, zval* rh)
+{
+    zval result;
+    ZVAL_NULL(&result);
+
+    compare_function(&result, lh, rh);
+    return (int) Z_LVAL(result);
+}
+
+bool execute_operator_callback(enum ast_type type, zval* arr, struct ast_node* lh, struct ast_node* rh)
+{
+    zval a, b, result;
+
+    zval* a_ptr = &a;
+    zval* b_ptr = &b;
+
+    if (lh->type == AST_SELECTOR) {
+        a_ptr = resolvePropertySelectorValue(arr, lh);
+		if (a_ptr == NULL) {
+			return false;
+		}
+    } else {
+        ZVAL_STRING(&a, (*lh).data.d_literal.value);
+    }
+
+    if (rh->type == AST_SELECTOR) {
+        b_ptr = resolvePropertySelectorValue(arr, rh);
+		if (b_ptr == NULL) {
+			return false;
+		}
+    } else {
+        ZVAL_STRING(&b, (*rh).data.d_literal.value);
+    }
+
+    bool ret;
+
+	switch (type) {
+	case AST_EQ:
+		ret = compare(a_ptr, b_ptr) == 0;
+        break;
+	case AST_NE:
+		ret = compare(a_ptr, b_ptr) != 0;
+        break;
+	case AST_LT:
+		ret = compare(a_ptr, b_ptr) < 0;
+        break;
+	case AST_LTE:
+		ret = compare(a_ptr, b_ptr) <= 0;
+        break;
+	case AST_GT:
+		ret = compare(a_ptr, b_ptr) > 0;
+        break;
+	case AST_GTE:
+		ret = compare(a_ptr, b_ptr) >= 0;
+        break;
+	case AST_ISSET:
+		ret = lh->data.d_literal.value_bool && rh->data.d_literal.value_bool;
+        break;
+	case AST_OR:
+		ret = lh->data.d_literal.value_bool || rh->data.d_literal.value_bool;
+        break;
+	case AST_AND:
+		ret = lh->data.d_literal.value_bool && rh->data.d_literal.value_bool;
+        break;
+	case AST_RGXP:
+		ret = false;
+        break;
+		// return compare_rgxp;
+	}
+
+    zval_ptr_dtor(a_ptr);
+    zval_ptr_dtor(b_ptr);
+
+    return ret;
 }
 
 bool is_scalar(zval* arg)
