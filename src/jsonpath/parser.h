@@ -40,7 +40,7 @@ enum ast_type {
     AST_HEAD
 };
 
-extern const char* ast_str[];
+extern const char* AST_STR[];
 
 union ast_node_data {
     struct {
@@ -86,8 +86,8 @@ bool compare_isset(zval* lh, zval* rh);	// lh = rh
 bool compare_rgxp(zval* lh, zval* rh);
 
 bool evaluate_subexpression(
+    zval* array,
     enum ast_type operator_type,
-    zval* arr, 
     struct ast_node* lh_operand, 
     struct ast_node* rh_operand);
 
@@ -107,7 +107,5 @@ void parse_filter_list(
 	int lex_tok_count,
 	struct ast_node* tok
 );
-
-void* jpath_malloc(size_t size);
 
 #endif				/* PARSER_H */

@@ -8,7 +8,7 @@
 bool is_unary(enum ast_type);
 int get_operator_precedence(struct ast_node* tok);
 
-const char* ast_str[] = {
+const char* AST_STR[] = {
     "AST_AND",
     "AST_BOOL",
     "AST_EQ",
@@ -45,12 +45,13 @@ struct ast_node* ast_alloc_node(struct ast_node* prev, enum ast_type type)
 	return next;
 }
 
-void print_ast(struct ast_node* head, int level)
+#ifdef JSONPATH_DEBUG
+void print_ast(struct ast_node* head, const char* m, int level)
 {
 	if (level == 0) {
-		printf("--------------------------------\n");
-		printf("AST Structure\n\n");
-		print_ast(head, level+1);
+		printf("--------------------------------------\n");
+		printf("%s\n\n", m);
+		print_ast(head, m, level+1);
 		return;
 	}
 
@@ -59,31 +60,25 @@ void print_ast(struct ast_node* head, int level)
 	while (head != NULL) {
 		for (int i = 0; i < level; i++)
 			printf("\t");
-		printf("➔ %s\n", ast_str[head->type]);
+		printf("➔ %s", AST_STR[head->type]);
 		switch (head->type) {
 		case AST_EXPR:
+			printf("\n");
 			ptr = head->data.d_expression.head;
-			// print_ast(ptr, level+1);
+			print_ast(head->data.d_expression.head, m, level+1);
 			break;
 		case AST_SELECTOR:
-			for (int i = 0; i < level+1; i++)
-				printf("\t");
-			printf("• %s\n", head->data.d_selector.value);
+			printf(" [val=%s]", head->data.d_selector.value);
 			break;
 		case AST_LITERAL:
-			for (int i = 0; i < level+1; i++)
-				printf("\t");
-			printf("• %s\n", head->data.d_literal.value);
-			break;
-		case AST_LITERAL_BOOL:
-			for (int i = 0; i < level+1; i++)
-				printf("\t");
-			printf("• %s\n", head->data.d_literal.value_bool);
+			printf(" [val=%s]", head->data.d_literal.value);
 			break;
 		}
+		printf("\n");
 		head = head->next;
 	}
 }
+#endif
 
 // See http://csis.pace.edu/~wolf/CS122/infix-postfix.htm
 bool convert_to_postfix(struct ast_node* expr_start)
@@ -326,8 +321,11 @@ bool build_parse_tree(
 			cur->data.d_expression.head->type = AST_HEAD;
 
 			build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_expression.head, err);
-			// print_ast(cur, 0);
-			// print_ast(cur, 0);
+
+			#ifdef JSONPATH_DEBUG
+			print_ast(cur->data.d_expression.head, "Parser - Expression before infix-postfix conversion", 0);
+			#endif
+
 			convert_to_postfix(cur->data.d_expression.head);
 
 			/* trim dummy head */
@@ -337,7 +335,6 @@ bool build_parse_tree(
 			/* return call initiated by LEX_EXPR_START */
 			return true;
 		default:
-			// printf("build_parse_tree: default\n");
 			break;
 		}
 	}
@@ -389,8 +386,7 @@ void parse_filter_list(
 			tok->data.d_list.indexes[tok->data.d_list.count] = atoi(lex_tok_values[*lex_idx]);
 			tok->data.d_list.count++;
 		} else {
-			// printf("parse_filter_list, got %s", visible[lex_tok[*lex_idx]]);
-			// return;
+			// todo error
 		}
 	}
 }
@@ -443,19 +439,19 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 		switch (get_token_type(tok->type)) {
 		case TYPE_OPERATOR:
 
-			if (!is_unary(tok->type)) {
-				expr_rh = stack_top(&s);
-				stack_pop(&s);
+			if (is_unary(tok->type)) {
+				expr_rh = NULL;
 				expr_lh = stack_top(&s);
 			}
 			else {
 				expr_rh = stack_top(&s);
-				expr_lh = expr_rh;
+				stack_pop(&s);
+				expr_lh = stack_top(&s);
 			}
 
 			stack_pop(&s);
 
-			if (evaluate_subexpression(tok->type, arr, expr_lh, expr_rh)) {
+			if (evaluate_subexpression(arr, tok->type, expr_lh, expr_rh)) {
 				stack_push(&s, &op_true);
 			}
 			else {
@@ -520,7 +516,7 @@ int get_operator_precedence(struct ast_node* tok)
 	case AST_LITERAL_BOOL:
 	case AST_BOOL:
 	default:
-		printf("Error, no operator precedence for %s", ast_str[tok->type]);
+		printf("Error, no operator precedence for %s", AST_STR[tok->type]);
 		break;
 	}
 }

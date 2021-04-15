@@ -159,14 +159,14 @@ bool evaluate_test(lex_token expected_token,
     printf("\ttoken\t%s\n"
         "\tvalue\t'%s%s'\n"
         "\tremain\t'%s%s'\n\n",
-        visible[expected_token],
+        LEX_STR[expected_token],
         expected_value, strlen(expected_value) > 0 ? "" : "(Empty)",
         expected_remaining, strlen(expected_remaining) > 0 ? "" : "(Empty)");
     printf(ANSI_COLOR_BLUE "Actual:\n" ANSI_COLOR_RESET);
     printf("\ttoken\t%s\n"
         "\tvalue\t'%s%s'\n"
         "\tremain\t'%s%s'\n\n",
-        visible[actual_token],
+        LEX_STR[actual_token],
         actual_value, strlen(actual_value) > 0 ? "" : "(Empty)",
         actual_remaining, strlen(actual_remaining) > 0 ? "" : "(Empty)");
     printf("Result:\n");

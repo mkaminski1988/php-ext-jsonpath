@@ -11,7 +11,7 @@ static bool extract_unbounded_literal(char* p, char* buffer, size_t bufSize, lex
 static bool extract_unbounded_numeric_literal(char* p, char* buffer, size_t bufSize, lex_error* err);
 static bool extract_boolean_literal(char* p, char* buffer, size_t bufSize, lex_error* err);
 
-const char* visible[] = {
+const char* LEX_STR[] = {
 	"LEX_NOT_FOUND",      /* Token not found */
 	"LEX_ROOT",           /* $ */
 	"LEX_CUR_NODE",       /* @ */

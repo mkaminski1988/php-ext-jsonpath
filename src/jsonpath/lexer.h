@@ -31,7 +31,7 @@ typedef enum {
     LEX_ERR             /* Signals lexing error */
 } lex_token;
 
-extern const char* visible[];
+extern const char* LEX_STR[];
 
 typedef struct {
     char* pos;       /* The position where lexing stopped */
