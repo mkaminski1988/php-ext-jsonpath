@@ -160,11 +160,11 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
         case AST_INDEX_LIST:
             executeIndexFilter(arr, tok, return_value);
             tok = tok->next;
-            break;
+            return;
         case AST_INDEX_SLICE:
             executeSlice(arr, tok, return_value);
             tok = tok->next;
-            break;
+            return;
         case AST_ROOT:
             tok = tok->next;
             break;
@@ -181,7 +181,7 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
         case AST_EXPR:
             executeExpression(arr, tok, return_value);
             tok = tok->next;
-            break;
+            return;
         }
     }
 }
