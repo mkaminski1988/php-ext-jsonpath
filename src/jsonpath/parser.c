@@ -90,10 +90,10 @@ void print_ast(struct ast_node* head, const char* m, int level)
 // See http://csis.pace.edu/~wolf/CS122/infix-postfix.htm
 bool convert_to_postfix(struct ast_node* expr_start)
 {
-	stack s;
+	stack s = {0};
 	stack_init(&s);
 	struct ast_node* cur = expr_start->next;
-	struct ast_node* tmp;
+	struct ast_node* tmp = NULL;
 	struct ast_node* pfix = expr_start;
 
 	while (cur != NULL) {
@@ -146,12 +146,9 @@ bool convert_to_postfix(struct ast_node* expr_start)
 		case TYPE_PAREN:
 			if (cur->type == AST_PAREN_LEFT) {
 				stack_push(&s, cur);
-				tmp = cur;
 				cur = cur->next;
-				efree(tmp);
 			}
 			else {
-				cur = cur->next;
 				while (s.size > 0) {
 					tmp = stack_top(&s);
 					stack_pop(&s);
@@ -162,6 +159,10 @@ bool convert_to_postfix(struct ast_node* expr_start)
 					pfix->next = tmp;
 					pfix = pfix->next;
 				}
+				/* free right paren */
+				tmp = cur;
+				cur = cur->next;
+				efree(tmp);
 			}
 			break;
 		}
