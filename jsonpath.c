@@ -22,10 +22,10 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value);
 void executeExpression(zval* arr, struct ast_node* tok, zval* return_value);
 void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value);
-void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy);
+void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value);
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
 zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok);
-struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy);
+struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value);
 void execWildcard(zval* arr, struct ast_node* tok, zval* return_value);
 bool is_scalar(zval* arg);
 void copyToReturnResult(zval* arr, zval* return_value);
@@ -159,28 +159,25 @@ void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
         switch (tok->type) {
         case AST_INDEX_LIST:
             executeIndexFilter(arr, tok, return_value);
-            tok = tok->next;
             return;
         case AST_INDEX_SLICE:
             executeSlice(arr, tok, return_value);
-            tok = tok->next;
             return;
         case AST_ROOT:
             tok = tok->next;
             break;
         case AST_RECURSE:
             tok = tok->next;
-            execRecursiveArrayWalk(arr, tok, return_value, 0);
+            execRecursiveArrayWalk(arr, tok, return_value);
             return;
         case AST_SELECTOR:
-            execSelectorChain(arr, tok, return_value, 0);
+            execSelectorChain(arr, tok, return_value);
             return;
         case AST_WILD_CARD:
             execWildcard(arr, tok, return_value);
             return;
         case AST_EXPR:
             executeExpression(arr, tok, return_value);
-            tok = tok->next;
             return;
         }
     }
@@ -194,7 +191,7 @@ void copyToReturnResult(zval* arr, zval* return_value)
     add_next_index_zval(return_value, &tmp);
 }
 
-struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy)
+struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value)
 {
     if (Z_TYPE_P(arr) != IS_ARRAY) {
         return NULL;
@@ -212,9 +209,12 @@ struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return
     }   
 }
 
-
 void execWildcard(zval* arr, struct ast_node* tok, zval* return_value)
 {
+    if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
+        return;
+    }
+
     zval* data;
     zval* zv_dest;
     zend_string* key;
@@ -231,7 +231,7 @@ void execWildcard(zval* arr, struct ast_node* tok, zval* return_value)
     ZEND_HASH_FOREACH_END();
 }
 
-void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy)
+void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value)
 {
     if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
         return;
@@ -242,10 +242,10 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value,
     zend_string* key;
     zend_ulong num_key;
 
-    execSelectorChain(arr, tok, return_value, xy+1);
+    evaluateAST(arr, tok, return_value);
 
     ZEND_HASH_FOREACH_KEY_VAL(HASH_OF(arr), num_key, key, data) {
-        execRecursiveArrayWalk(data, tok, return_value, xy+1);
+        execRecursiveArrayWalk(data, tok, return_value);
     }
     ZEND_HASH_FOREACH_END();
 }
