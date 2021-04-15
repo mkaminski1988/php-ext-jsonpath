@@ -63,7 +63,7 @@ void print_ast(struct ast_node* head, int level)
 		switch (head->type) {
 		case AST_EXPR:
 			ptr = head->data.d_expression.head;
-			print_ast(ptr, level+1);
+			// print_ast(ptr, level+1);
 			break;
 		case AST_SELECTOR:
 			for (int i = 0; i < level+1; i++)
@@ -211,6 +211,18 @@ bool build_parse_tree(
 				cur->data.d_selector.child_scope = false;
 			}
 			strcpy(cur->data.d_selector.value, lex_tok_values[*lex_idx]);
+
+			if (*lex_idx < lex_tok_count - 1) { /* TODO next-node macro? */
+				switch (lex_tok[(*lex_idx)+1]) {
+					case LEX_PAREN_CLOSE:
+						// fall-through
+					case LEX_OR:
+						// fall-through
+					case LEX_AND:
+						cur = ast_alloc_node(cur, AST_ISSET);
+						break;
+				}
+			}
 			break;
 		case LEX_FILTER_START:
 
@@ -250,9 +262,6 @@ bool build_parse_tree(
 			cur = ast_alloc_node(cur, AST_PAREN_LEFT);
 			break;
 		case LEX_PAREN_CLOSE:
-			if (cur->type == AST_SELECTOR) {
-				cur = ast_alloc_node(cur, AST_ISSET);
-			}
 			cur = ast_alloc_node(cur, AST_PAREN_RIGHT);
 			break;
 		case LEX_LITERAL:
@@ -318,8 +327,8 @@ bool build_parse_tree(
 
 			build_parse_tree(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur->data.d_expression.head, err);
 			// print_ast(cur, 0);
-			convert_to_postfix(cur->data.d_expression.head);
 			// print_ast(cur, 0);
+			convert_to_postfix(cur->data.d_expression.head);
 
 			/* trim dummy head */
 			cur->data.d_expression.head = cur->data.d_expression.head->next;
@@ -446,7 +455,7 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 
 			stack_pop(&s);
 
-			if (execute_operator_callback(tok->type, arr, expr_lh, expr_rh)) {
+			if (evaluate_subexpression(tok->type, arr, expr_lh, expr_rh)) {
 				stack_push(&s, &op_true);
 			}
 			else {

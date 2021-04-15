@@ -85,7 +85,11 @@ bool compare_neq(zval* lh, zval* rh);
 bool compare_isset(zval* lh, zval* rh);	// lh = rh
 bool compare_rgxp(zval* lh, zval* rh);
 
-bool execute_operator_callback(enum ast_type type, zval* arr, struct ast_node* lh, struct ast_node* rh);
+bool evaluate_subexpression(
+    enum ast_type operator_type,
+    zval* arr, 
+    struct ast_node* lh_operand, 
+    struct ast_node* rh_operand);
 
 bool build_parse_tree(
 	lex_token lex_tok[PARSE_BUF_LEN],

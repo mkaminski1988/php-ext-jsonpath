@@ -25,7 +25,6 @@ void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value);
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
 zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok);
-void resolveIssetSelector(zval* arr, struct ast_node* node);
 struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value, int xy);
 void execWildcard(zval* arr, struct ast_node* tok, zval* return_value);
 bool is_scalar(zval* arg);
@@ -356,9 +355,6 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
     ZEND_HASH_FOREACH_END();
 }
 
-/* populate the expression operator with the array value that */
-/* corresponds to the JSON-path object selector. */
-/* e.g. $.path.to.val -> $[path][to][val] */
 zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok)
 {
     zval* data;
@@ -373,25 +369,6 @@ zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok)
 
     return arr;
 }
-
-/* assign the isset() operator a boolean value based on whether there is an */
-/* array key for the corresponding JSON-path object selector. */
-void resolveIssetSelector(zval* arr, struct ast_node* node)
-{
-    // zval* data;
-
-    // for (int i = 0; i < node->label_count; i++) {
-    //     if ((data = zend_hash_str_find(HASH_OF(arr), node->label[i], strlen(node->label[i]))) == NULL) {
-    //         node->value_bool = false;
-    //         break;
-    //     }
-    //     else {
-    //         node->value_bool = true;
-    //         arr = data;
-    //     }
-    // }
-}
-
 
 int compare(zval* lh, zval* rh)
 {
@@ -428,68 +405,77 @@ bool compare_rgxp(zval* lh, zval* rh)
     return Z_LVAL(retval) > 0;
 }
 
-bool execute_operator_callback(enum ast_type type, zval* arr, struct ast_node* lh, struct ast_node* rh)
+bool evaluate_subexpression(
+    enum ast_type operator_type,
+    zval* php_array,
+    struct ast_node* lh_operand,
+    struct ast_node* rh_operand)
 {
-    zval a, b, result;
+    zval zval_lh, zval_rh;
 
-    zval* a_ptr = &a;
-    zval* b_ptr = &b;
+    zval* zval_lh_ptr = &zval_lh;
+    zval* zval_rh_ptr = &zval_rh;
 
-    if (lh->type == AST_SELECTOR) {
-        a_ptr = resolvePropertySelectorValue(arr, lh);
-		if (a_ptr == NULL) {
+    if (lh_operand->type == AST_SELECTOR) {
+        zval_lh_ptr = resolvePropertySelectorValue(php_array, lh_operand);
+		if (zval_lh_ptr == NULL) {
 			return false;
 		}
     } else {
-        ZVAL_STRING(&a, (*lh).data.d_literal.value);
+        ZVAL_STRING(&zval_lh, lh_operand->data.d_literal.value);
     }
 
-    if (rh->type == AST_SELECTOR) {
-        b_ptr = resolvePropertySelectorValue(arr, rh);
-		if (b_ptr == NULL) {
-			return false;
-		}
-    } else {
-        ZVAL_STRING(&b, (*rh).data.d_literal.value);
+    if (!is_unary(operator_type)) {
+        if (rh_operand->type == AST_SELECTOR) {
+            zval_rh_ptr = resolvePropertySelectorValue(php_array, rh_operand);
+            if (zval_rh_ptr == NULL) {
+                return false;
+            }
+        } else {
+            ZVAL_STRING(&zval_rh, rh_operand->data.d_literal.value);
+        }
     }
 
     bool ret;
 
-	switch (type) {
+	switch (operator_type) {
 	case AST_EQ:
-		ret = compare(a_ptr, b_ptr) == 0;
+		ret = compare(zval_lh_ptr, zval_rh_ptr) == 0;
         break;
 	case AST_NE:
-		ret = compare(a_ptr, b_ptr) != 0;
+		ret = compare(zval_lh_ptr, zval_rh_ptr) != 0;
         break;
 	case AST_LT:
-		ret = compare(a_ptr, b_ptr) < 0;
+		ret = compare(zval_lh_ptr, zval_rh_ptr) < 0;
         break;
 	case AST_LTE:
-		ret = compare(a_ptr, b_ptr) <= 0;
+		ret = compare(zval_lh_ptr, zval_rh_ptr) <= 0;
         break;
 	case AST_GT:
-		ret = compare(a_ptr, b_ptr) > 0;
+		ret = compare(zval_lh_ptr, zval_rh_ptr) > 0;
         break;
 	case AST_GTE:
-		ret = compare(a_ptr, b_ptr) >= 0;
+		ret = compare(zval_lh_ptr, zval_rh_ptr) >= 0;
         break;
 	case AST_ISSET:
-		ret = lh->data.d_literal.value_bool && rh->data.d_literal.value_bool;
+        ret = resolvePropertySelectorValue(php_array, lh_operand) != NULL;
         break;
 	case AST_OR:
-		ret = lh->data.d_literal.value_bool || rh->data.d_literal.value_bool;
+		ret = lh_operand->data.d_literal.value_bool || rh_operand->data.d_literal.value_bool;
         break;
 	case AST_AND:
-		ret = lh->data.d_literal.value_bool && rh->data.d_literal.value_bool;
+		ret = lh_operand->data.d_literal.value_bool && rh_operand->data.d_literal.value_bool;
         break;
 	case AST_RGXP:
-		ret = compare_rgxp(a_ptr, b_ptr);
+		ret = compare_rgxp(zval_lh_ptr, zval_rh_ptr);
         break;
 	}
 
-    zval_ptr_dtor(a_ptr);
-    zval_ptr_dtor(b_ptr);
+    zval_ptr_dtor(zval_lh_ptr);
+
+    if (!is_unary(operator_type)) {
+        zval_ptr_dtor(zval_rh_ptr);
+    }
 
     return ret;
 }
