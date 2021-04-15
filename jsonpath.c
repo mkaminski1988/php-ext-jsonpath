@@ -29,6 +29,13 @@ struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return
 void execWildcard(zval* arr, struct ast_node* tok, zval* return_value);
 bool is_scalar(zval* arg);
 void copyToReturnResult(zval* arr, zval* return_value);
+#ifdef JSONPATH_DEBUG
+void print_lex_tokens(
+    lex_token lex_tok[PARSE_BUF_LEN],
+    char lex_tok_literals[][PARSE_BUF_LEN],
+    int lex_tok_count,
+	const char* m);
+#endif
 
 zend_class_entry* jsonpath_ce;
 
@@ -60,6 +67,10 @@ PHP_METHOD(JsonPath, find)
         return;
     }
 
+    #ifdef JSONPATH_DEBUG
+    print_lex_tokens(lex_tok, lex_tok_literals, lex_tok_count, "Lexer - Processed tokens");
+    #endif
+
     /* assemble an array of query execution instructions from parsed tokens */
 
     parse_error p_err;
@@ -70,7 +81,9 @@ PHP_METHOD(JsonPath, find)
         zend_throw_exception(spl_ce_RuntimeException, p_err.msg, 0);
     }
 
-    // print_ast(head.next, 0);
+    #ifdef JSONPATH_DEBUG
+    print_ast(head.next, "Parser - AST sent to interpreter", 0);
+    #endif
 
     /* execute the JSON-path query instructions against the search target (PHP object/array) */
 
@@ -78,7 +91,6 @@ PHP_METHOD(JsonPath, find)
 
     struct ast_node* next = head.next;
 
-    // printf("Evaluating...\n");
     evaluateAST(search_target, next, return_value);
 
     // /* free the memory allocated for filter expressions */
@@ -116,8 +128,6 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
                 "The query is too long. Token count exceeds PARSE_BUF_LEN.", 0);
             return false;
         }
-
-        // printf("\t➔ %s\n", visible[cur_tok]);
 
         switch (cur_tok) {
         case LEX_NODE:
@@ -406,33 +416,33 @@ bool compare_rgxp(zval* lh, zval* rh)
 }
 
 bool evaluate_subexpression(
+    zval* arr,
     enum ast_type operator_type,
-    zval* php_array,
     struct ast_node* lh_operand,
     struct ast_node* rh_operand)
 {
-    zval zval_lh, zval_rh;
+    zval val_lh, val_rh;
 
-    zval* zval_lh_ptr = &zval_lh;
-    zval* zval_rh_ptr = &zval_rh;
+    zval* val_lh_p = &val_lh;
+    zval* val_rh_p = &val_rh;
 
     if (lh_operand->type == AST_SELECTOR) {
-        zval_lh_ptr = resolvePropertySelectorValue(php_array, lh_operand);
-		if (zval_lh_ptr == NULL) {
+        val_lh_p = resolvePropertySelectorValue(arr, lh_operand);
+		if (val_lh_p == NULL) {
 			return false;
 		}
     } else {
-        ZVAL_STRING(&zval_lh, lh_operand->data.d_literal.value);
+        ZVAL_STRING(&val_lh, lh_operand->data.d_literal.value);
     }
 
     if (!is_unary(operator_type)) {
         if (rh_operand->type == AST_SELECTOR) {
-            zval_rh_ptr = resolvePropertySelectorValue(php_array, rh_operand);
-            if (zval_rh_ptr == NULL) {
+            val_rh_p = resolvePropertySelectorValue(arr, rh_operand);
+            if (val_rh_p == NULL) {
                 return false;
             }
         } else {
-            ZVAL_STRING(&zval_rh, rh_operand->data.d_literal.value);
+            ZVAL_STRING(&val_rh, rh_operand->data.d_literal.value);
         }
     }
 
@@ -440,25 +450,25 @@ bool evaluate_subexpression(
 
 	switch (operator_type) {
 	case AST_EQ:
-		ret = compare(zval_lh_ptr, zval_rh_ptr) == 0;
+		ret = compare(val_lh_p, val_rh_p) == 0;
         break;
 	case AST_NE:
-		ret = compare(zval_lh_ptr, zval_rh_ptr) != 0;
+		ret = compare(val_lh_p, val_rh_p) != 0;
         break;
 	case AST_LT:
-		ret = compare(zval_lh_ptr, zval_rh_ptr) < 0;
+		ret = compare(val_lh_p, val_rh_p) < 0;
         break;
 	case AST_LTE:
-		ret = compare(zval_lh_ptr, zval_rh_ptr) <= 0;
+		ret = compare(val_lh_p, val_rh_p) <= 0;
         break;
 	case AST_GT:
-		ret = compare(zval_lh_ptr, zval_rh_ptr) > 0;
+		ret = compare(val_lh_p, val_rh_p) > 0;
         break;
 	case AST_GTE:
-		ret = compare(zval_lh_ptr, zval_rh_ptr) >= 0;
+		ret = compare(val_lh_p, val_rh_p) >= 0;
         break;
 	case AST_ISSET:
-        ret = resolvePropertySelectorValue(php_array, lh_operand) != NULL;
+        ret = resolvePropertySelectorValue(arr, lh_operand) != NULL;
         break;
 	case AST_OR:
 		ret = lh_operand->data.d_literal.value_bool || rh_operand->data.d_literal.value_bool;
@@ -467,14 +477,14 @@ bool evaluate_subexpression(
 		ret = lh_operand->data.d_literal.value_bool && rh_operand->data.d_literal.value_bool;
         break;
 	case AST_RGXP:
-		ret = compare_rgxp(zval_lh_ptr, zval_rh_ptr);
+		ret = compare_rgxp(val_lh_p, val_rh_p);
         break;
 	}
 
-    zval_ptr_dtor(zval_lh_ptr);
+    zval_ptr_dtor(val_lh_p);
 
     if (!is_unary(operator_type)) {
-        zval_ptr_dtor(zval_rh_ptr);
+        zval_ptr_dtor(val_rh_p);
     }
 
     return ret;
@@ -497,9 +507,25 @@ bool is_scalar(zval* arg)
     }
 }
 
-void* jpath_malloc(size_t size) {
-    return emalloc(size);
+#ifdef JSONPATH_DEBUG
+void print_lex_tokens(
+    lex_token lex_tok[PARSE_BUF_LEN],
+    char lex_tok_literals[][PARSE_BUF_LEN],
+    int lex_tok_count,
+	const char* m)
+{
+	printf("--------------------------------------\n");
+	printf("%s\n\n", m);
+
+	for (int i = 0; i < lex_tok_count; i++) {
+		printf("\t• %s", LEX_STR[lex_tok[i]]);
+        if (strlen(lex_tok_literals[i]) > 0) {
+		    printf(" [val=%s]", lex_tok_literals[i]);
+        }
+		printf("\n");
+	}
 }
+#endif
 
 /* {{{ PHP_MINIT_FUNCTION
  */

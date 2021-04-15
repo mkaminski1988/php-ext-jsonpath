@@ -46,7 +46,7 @@ union ast_node_data {
     struct {
         int count;
         union ast_node_data* names[3];
-        int indexes[3];
+        int indexes[10]; /* todo check for max */
     } d_list;
     struct {
         char value[PARSE_BUF_LEN];

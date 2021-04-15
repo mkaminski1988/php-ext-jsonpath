@@ -68,13 +68,20 @@ void print_ast(struct ast_node* head, const char* m, int level)
 			print_ast(head->data.d_expression.head, m, level+1);
 			break;
 		case AST_SELECTOR:
-			printf(" [val=%s]", head->data.d_selector.value);
+			printf(" [val=%s]\n", head->data.d_selector.value);
 			break;
 		case AST_LITERAL:
-			printf(" [val=%s]", head->data.d_literal.value);
+			printf(" [val=%s]\n", head->data.d_literal.value);
 			break;
+		case AST_INDEX_SLICE:
+			printf(" [start=%d end=%d step=%d]\n",
+				head->data.d_list.indexes[0],
+				head->data.d_list.indexes[1],
+				head->data.d_list.indexes[2]);
+			break;
+		default:
+			printf("\n");
 		}
-		printf("\n");
 		head = head->next;
 	}
 }
@@ -234,7 +241,7 @@ bool build_parse_tree(
 				case LEX_SLICE:
 					// fall-through
 				case LEX_CHILD_SEP:
-					cur = ast_alloc_node(cur, AST_INDEX_SLICE);
+					cur = ast_alloc_node(cur, AST_INDEX_LIST);
 					parse_filter_list(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
 					break;
 				case LEX_WILD_CARD:
@@ -356,6 +363,11 @@ void parse_filter_list(
 	struct ast_node* tok
 ) {
 	int slice_count = 0;
+
+	/* assume filter type is an index list by default. this resolves type
+	/* ambiguity of a filter containing no separators. */
+	/* example: treat level4[0] as an index filter, not a slice. */
+	tok->type = AST_INDEX_LIST;
 
 	for (; *lex_idx < lex_tok_count; (*lex_idx)++) {
 		if (lex_tok[*lex_idx] == LEX_EXPR_END) {
