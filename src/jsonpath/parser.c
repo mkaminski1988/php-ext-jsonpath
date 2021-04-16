@@ -55,16 +55,14 @@ void print_ast(struct ast_node* head, const char* m, int level)
 		return;
 	}
 
-	struct ast_node* ptr;
-
 	while (head != NULL) {
-		for (int i = 0; i < level; i++)
+		for (int i = 0; i < level; i++) {
 			printf("\t");
+		}
 		printf("➔ %s", AST_STR[head->type]);
 		switch (head->type) {
 		case AST_EXPR:
 			printf("\n");
-			ptr = head->data.d_expression.head;
 			print_ast(head->data.d_expression.head, m, level+1);
 			break;
 		case AST_SELECTOR:
@@ -116,7 +114,7 @@ bool convert_to_postfix(struct ast_node* expr_start)
 			// TODO check missing operand on RHS
 			// if cur == NULL || (cur->next == NULL && !is_unary(cur->type)) {
 			// }
-			if (!s.size || stack_top(&s)->type == AST_PAREN_LEFT) {
+			if (!s.size || ((struct ast_node*)stack_top(&s))->type == AST_PAREN_LEFT) {
 				stack_push(&s, cur);
 				cur = cur->next;
 			}

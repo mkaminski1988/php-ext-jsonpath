@@ -6,7 +6,7 @@ void stack_init(stack* s)
     s->size = 0;
 }
 
-struct ast_node* stack_top(stack* s)
+void* stack_top(stack* s)
 {
     if (s->size == 0) {
 	    printf("Stack is empty\n");
@@ -16,7 +16,7 @@ struct ast_node* stack_top(stack* s)
     return s->data[s->size - 1];
 }
 
-void stack_push(stack* s, struct ast_node* tok)
+void stack_push(stack* s, void* tok)
 {
     if (s->size < STACK_MAX) {
 	    s->data[s->size++] = tok;

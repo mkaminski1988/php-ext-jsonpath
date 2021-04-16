@@ -81,7 +81,7 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 		case '[':
 			(*p)++;
 
-			for (; **p != '\0' && **p == ' '; (*p)++);
+			for (; **p == ' '; (*p)++);
 
 			switch (**p) {
 			case '\'':
@@ -90,7 +90,7 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 				}
 				*p += strlen(buffer) + 2;
 
-				for (; **p != '\0' && **p == ' '; (*p)++);
+				for (; **p == ' '; (*p)++);
 
 				if (**p != ']') {
 					err->pos = *p;
@@ -105,7 +105,7 @@ lex_token scan(char** p, char* buffer, size_t bufSize, lex_error* err)
 				}
 				*p += strlen(buffer) + 2;
 
-				for (; **p != '\0' && **p == ' '; (*p)++);
+				for (; **p == ' '; (*p)++);
 
 				if (**p != ']') {
 					err->pos = *p;
@@ -295,7 +295,7 @@ static bool extract_quoted_literal(char* p, char* buffer, size_t bufSize, lex_er
 
 	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
 		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
+		sprintf(err->msg, "String size exceeded %zu bytes", bufSize);
 		return false;
 	}
 
@@ -309,7 +309,7 @@ static bool extract_unbounded_literal(char* p, char* buffer, size_t bufSize, lex
 	char* start;
 	size_t cpy_len;
 
-	for (; *p != '\0' && *p == ' '; p++);
+	for (; *p == ' '; p++);
 
 	start = p;
 
@@ -319,7 +319,7 @@ static bool extract_unbounded_literal(char* p, char* buffer, size_t bufSize, lex
 
 	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
 		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
+		sprintf(err->msg, "String size exceeded %zu bytes", bufSize);
 		return false;
 	}
 
@@ -333,7 +333,7 @@ static bool extract_unbounded_numeric_literal(char* p, char* buffer, size_t bufS
 	char* start;
 	size_t cpy_len;
 
-	for (; *p != '\0' && *p == ' '; p++);
+	for (; *p == ' '; p++);
 
 	start = p;
 
@@ -354,7 +354,7 @@ static bool extract_unbounded_numeric_literal(char* p, char* buffer, size_t bufS
 
 	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
 		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
+		sprintf(err->msg, "String size exceeded %zu bytes", bufSize);
 		return false;
 	}
 
@@ -367,7 +367,7 @@ static bool extract_boolean_literal(char* p, char* buffer, size_t bufSize, lex_e
 	char* start;
 	size_t cpy_len;
 
-	for (; *p != '\0' && *p == ' '; p++);
+	for (; *p == ' '; p++);
 
 	start = p;
 
@@ -377,7 +377,7 @@ static bool extract_boolean_literal(char* p, char* buffer, size_t bufSize, lex_e
 
 	if (jp_str_cpy(buffer, bufSize, start, cpy_len) > 0) {
 		err->pos = p;
-		sprintf(err->msg, "String size exceeded %ld bytes", bufSize);
+		sprintf(err->msg, "String size exceeded %zu bytes", bufSize);
 		return false;
 	}
 

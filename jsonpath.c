@@ -251,12 +251,11 @@ void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value)
 
 void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value)
 {
-    zval* data;
-
     for (int i = 0; i < tok->data.d_list.count; i++) {
         if (tok->data.d_list.indexes[i] < 0) {
             tok->data.d_list.indexes[i] = zend_hash_num_elements(HASH_OF(arr)) - abs(tok->data.d_list.indexes[i]);
         }
+        zval* data;
         if ((data = zend_hash_index_find(HASH_OF(arr), tok->data.d_list.indexes[i])) != NULL) {
             if (tok->next == NULL) {
                 copyToReturnResult(data, return_value);
@@ -394,7 +393,6 @@ int compare(zval* lh, zval* rh)
 
 bool compare_rgxp(zval* lh, zval* rh)
 {
-    zval pattern;
     pcre_cache_entry* pce;
 
     if ((pce = pcre_get_compiled_regex_cache(Z_STR_P(rh))) == NULL) {
