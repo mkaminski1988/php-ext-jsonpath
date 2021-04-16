@@ -415,77 +415,74 @@ bool compare_rgxp(zval* lh, zval* rh)
     return Z_LVAL(retval) > 0;
 }
 
+zval* operand_to_zval(struct ast_node* src, zval* tmp_dest, zval* arr)
+{
+    if (src->type == AST_SELECTOR) {
+        return resolvePropertySelectorValue(arr, src);
+    } else if (src->type == AST_LITERAL) {
+        ZVAL_STRING(tmp_dest, src->data.d_literal.value);
+        return tmp_dest;
+    } else {
+        /* todo: runtime error */
+    }
+}
+
 bool evaluate_subexpression(
     zval* arr,
     enum ast_type operator_type,
     struct ast_node* lh_operand,
     struct ast_node* rh_operand)
 {
-    zval val_lh, val_rh;
-
-    zval* val_lh_p = &val_lh;
-    zval* val_rh_p = &val_rh;
-
-    if (lh_operand->type == AST_SELECTOR) {
-        val_lh_p = resolvePropertySelectorValue(arr, lh_operand);
-		if (val_lh_p == NULL) {
-			return false;
-		}
-    } else {
-        ZVAL_STRING(&val_lh, lh_operand->data.d_literal.value);
+    switch (operator_type) {
+    case AST_OR:
+        return lh_operand->data.d_literal.value_bool || rh_operand->data.d_literal.value_bool;
+    case AST_AND:
+        return lh_operand->data.d_literal.value_bool && rh_operand->data.d_literal.value_bool;
+    case AST_ISSET:
+        return resolvePropertySelectorValue(arr, lh_operand) != NULL;
     }
 
-    if (!is_unary(operator_type)) {
-        if (rh_operand->type == AST_SELECTOR) {
-            val_rh_p = resolvePropertySelectorValue(arr, rh_operand);
-            if (val_rh_p == NULL) {
-                return false;
-            }
-        } else {
-            ZVAL_STRING(&val_rh, rh_operand->data.d_literal.value);
-        }
+    /* use stack-allocated zvals in order to avoid malloc, if possible */
+    zval tmp_lh = {0}, tmp_rh = {0};
+
+    zval* val_lh = operand_to_zval(lh_operand, &tmp_lh, arr);
+    if (val_lh == NULL) {
+        return false;
+    }
+
+    zval* val_rh = operand_to_zval(rh_operand, &tmp_rh, arr);
+    if (val_rh == NULL) {
+        return false;
     }
 
     bool ret;
 
 	switch (operator_type) {
 	case AST_EQ:
-		ret = compare(val_lh_p, val_rh_p) == 0;
+		ret = compare(val_lh, val_rh) == 0;
         break;
 	case AST_NE:
-		ret = compare(val_lh_p, val_rh_p) != 0;
+		ret = compare(val_lh, val_rh) != 0;
         break;
 	case AST_LT:
-		ret = compare(val_lh_p, val_rh_p) < 0;
+		ret = compare(val_lh, val_rh) < 0;
         break;
 	case AST_LTE:
-		ret = compare(val_lh_p, val_rh_p) <= 0;
+		ret = compare(val_lh, val_rh) <= 0;
         break;
 	case AST_GT:
-		ret = compare(val_lh_p, val_rh_p) > 0;
+		ret = compare(val_lh, val_rh) > 0;
         break;
 	case AST_GTE:
-		ret = compare(val_lh_p, val_rh_p) >= 0;
-        break;
-	case AST_ISSET:
-        ret = resolvePropertySelectorValue(arr, lh_operand) != NULL;
-        break;
-	case AST_OR:
-		ret = lh_operand->data.d_literal.value_bool || rh_operand->data.d_literal.value_bool;
-        break;
-	case AST_AND:
-		ret = lh_operand->data.d_literal.value_bool && rh_operand->data.d_literal.value_bool;
+		ret = compare(val_lh, val_rh) >= 0;
         break;
 	case AST_RGXP:
-		ret = compare_rgxp(val_lh_p, val_rh_p);
+		ret = compare_rgxp(val_lh, val_rh);
         break;
 	}
 
-    zval_ptr_dtor(val_lh_p);
-
-    if (!is_unary(operator_type)) {
-        zval_ptr_dtor(val_rh_p);
-    }
+    zval_ptr_dtor(val_lh);
+    zval_ptr_dtor(val_rh);
 
     return ret;
 }
