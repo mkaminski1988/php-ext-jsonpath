@@ -25,7 +25,7 @@ void executeIndexFilter(zval* arr, struct ast_node* tok, zval* return_value);
 void execRecursiveArrayWalk(zval* arr, struct ast_node* tok, zval* return_value);
 void executeSlice(zval* arr, struct ast_node* tok, zval* return_value);
 zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok);
-struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value);
+void execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value);
 void execWildcard(zval* arr, struct ast_node* tok, zval* return_value);
 bool is_scalar(zval* arg);
 void copyToReturnResult(zval* arr, zval* return_value);
@@ -191,21 +191,20 @@ void copyToReturnResult(zval* arr, zval* return_value)
     add_next_index_zval(return_value, &tmp);
 }
 
-struct ast_node* execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value)
+void execSelectorChain(zval* arr, struct ast_node* tok, zval* return_value)
 {
-    if (Z_TYPE_P(arr) != IS_ARRAY) {
-        return NULL;
+    if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
+        return;
     }
 
     if ((arr = zend_hash_str_find(HASH_OF(arr), tok->data.d_selector.value, strlen(tok->data.d_selector.value))) == NULL) {
-        return NULL;
+        return;
     }
 
     if (tok->next != NULL) {
         evaluateAST(arr, tok->next, return_value);
     } else {
         copyToReturnResult(arr, return_value);
-        return tok;
     }   
 }
 
@@ -367,6 +366,10 @@ void executeExpression(zval* arr, struct ast_node* tok, zval* return_value)
 
 zval* resolvePropertySelectorValue(zval* arr, struct ast_node* tok)
 {
+    if (arr == NULL || Z_TYPE_P(arr) != IS_ARRAY) {
+        return NULL;
+    }
+
     zval* data;
 
     while (tok->type == AST_SELECTOR) {
