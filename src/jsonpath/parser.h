@@ -6,7 +6,7 @@
 #include <stdbool.h>
 #include <Zend/zend_smart_str.h> /* todo where is zval defined? */
 
-#define PARSE_BUF_LEN 50
+#define PARSE_BUF_LEN 64
 
 typedef enum {
     TYPE_OPERAND,
@@ -45,8 +45,7 @@ extern const char* AST_STR[];
 union ast_node_data {
     struct {
         int count;
-        union ast_node_data* names[3];
-        int indexes[10]; /* todo check for max */
+        int indexes[16]; /* todo check for max */
     } d_list;
     struct {
         char value[PARSE_BUF_LEN];
@@ -73,17 +72,6 @@ typedef struct {
 
 bool evaluate_postfix_expression(zval* arr, struct ast_node* tok);
 operator_type get_token_type(enum ast_type);
-
-bool compare_lt(zval* lh, zval* rh);
-bool compare_lte(zval* lh, zval* rh);
-bool compare_gt(zval* lh, zval* rh);
-bool compare_gte(zval* lh, zval* rh);
-bool compare_and(zval* lh, zval* rh);
-bool compare_or(zval* lh, zval* rh);
-bool compare_eq(zval* lh, zval* rh);
-bool compare_neq(zval* lh, zval* rh);
-bool compare_isset(zval* lh, zval* rh);	// lh = rh
-bool compare_rgxp(zval* lh, zval* rh);
 
 bool evaluate_subexpression(
     zval* array,
