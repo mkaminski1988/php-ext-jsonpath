@@ -108,4 +108,6 @@ void parse_filter_list(
 	struct ast_node* tok
 );
 
+bool check_parens_balance(lex_token lex_tok[], int lex_tok_count);
+
 #endif				/* PARSER_H */

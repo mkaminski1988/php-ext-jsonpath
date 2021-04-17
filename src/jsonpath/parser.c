@@ -531,3 +531,27 @@ int get_operator_precedence(struct ast_node* tok)
 		break;
 	}
 }
+
+bool check_parens_balance(lex_token lex_tok[], int lex_tok_count)
+{
+	stack s = {0};
+	stack_init(&s);
+
+	for (int i = 0; i < lex_tok_count; i++) {
+		if (lex_tok[i] == LEX_EXPR_START || lex_tok[i] == LEX_PAREN_OPEN || lex_tok[i] == LEX_FILTER_START) {
+			stack_push(&s, &lex_tok[i]);
+		} else if (lex_tok[i] == LEX_EXPR_END || lex_tok[i] == LEX_PAREN_CLOSE) {
+			if (s.size == 0) {
+				return false;
+			}
+			lex_token* top = stack_top(&s);
+			lex_token expected = (*top == LEX_EXPR_START || *top == LEX_FILTER_START ) ? LEX_EXPR_END : LEX_PAREN_CLOSE;
+			if (lex_tok[i] != expected) {
+				return false;
+			}
+			stack_pop(&s);
+		}
+	}
+
+	return s.size == 0;
+}

@@ -13,4 +13,4 @@ try {
     echo get_class($e) . ": " . $e->getMessage();
 }
 --EXPECT--
-RuntimeException: Missing filter end ]
+RuntimeException: unbalanced parens found
