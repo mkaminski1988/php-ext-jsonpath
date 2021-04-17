@@ -4,6 +4,8 @@
 #include <limits.h>
 #include <stdio.h>
 #include "safe_string.h"
+#include "zend_exceptions.h"
+#include <ext/spl/spl_exceptions.h>
 
 bool is_unary(enum ast_type);
 int get_operator_precedence(struct ast_node* tok);
@@ -345,12 +347,6 @@ bool build_parse_tree(
 		}
 	}
 
-	// if (expr_start_count != 0) {
-	// 	/* we made it to the end without finding an expression terminator */
-	// 	strncpy(err->msg, "Missing filter end ]", sizeof(err->msg));
-	// 	return false;
-	// }
-
 	return true;
 }
 
@@ -536,22 +532,39 @@ bool check_parens_balance(lex_token lex_tok[], int lex_tok_count)
 {
 	stack s = {0};
 	stack_init(&s);
+	bool ret = true;
 
 	for (int i = 0; i < lex_tok_count; i++) {
-		if (lex_tok[i] == LEX_EXPR_START || lex_tok[i] == LEX_PAREN_OPEN || lex_tok[i] == LEX_FILTER_START) {
-			stack_push(&s, &lex_tok[i]);
-		} else if (lex_tok[i] == LEX_EXPR_END || lex_tok[i] == LEX_PAREN_CLOSE) {
-			if (s.size == 0) {
-				return false;
-			}
-			lex_token* top = stack_top(&s);
-			lex_token expected = (*top == LEX_EXPR_START || *top == LEX_FILTER_START ) ? LEX_EXPR_END : LEX_PAREN_CLOSE;
-			if (lex_tok[i] != expected) {
-				return false;
-			}
-			stack_pop(&s);
+		switch (lex_tok[i]) {
+			case LEX_EXPR_START:
+			case LEX_PAREN_OPEN:
+			case LEX_FILTER_START:
+				/* todo: stack capacity check */
+				stack_push(&s, &lex_tok[i]);
+				break;
+			case LEX_EXPR_END:
+			case LEX_PAREN_CLOSE:
+				if (s.size == 0) {
+					ret = false;
+					break;
+				}
+
+				lex_token* top = stack_top(&s);
+				lex_token expected = (*top == LEX_PAREN_OPEN) ? LEX_PAREN_CLOSE : LEX_EXPR_END;
+				if (lex_tok[i] != expected) {
+					ret = false;
+					break;
+				}
+
+				stack_pop(&s);
+				break;
 		}
 	}
 
-	return s.size == 0;
+	if (!ret || s.size > 0) {
+		zend_throw_exception(spl_ce_RuntimeException, "Query contains unbalanced parens/brackets", 0);
+		return false;
+	}
+
+	return true;
 }

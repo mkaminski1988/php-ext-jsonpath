@@ -150,12 +150,7 @@ bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_
 
     *tok_count = i;
 
-    if (!check_parens_balance(tok, *tok_count)) {
-        zend_throw_exception(spl_ce_RuntimeException, "unbalanced parens found", 0);
-        return false;
-    }
-
-    return true;
+    return check_parens_balance(tok, *tok_count);
 }
 
 void evaluateAST(zval* arr, struct ast_node* tok, zval* return_value)
