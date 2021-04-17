@@ -203,6 +203,8 @@ bool convert_to_postfix(struct ast_node* expr_start)
 	}
 
 	pfix->next = cur;
+
+	return true;
 }
 
 bool build_parse_tree(
@@ -244,11 +246,14 @@ bool build_parse_tree(
 			if (*lex_idx < lex_tok_count - 1) { /* TODO next-node macro? */
 				switch (lex_tok[(*lex_idx)+1]) {
 					case LEX_PAREN_CLOSE:
-						// fall-through
+						/* fall-through */
 					case LEX_OR:
-						// fall-through
+						/* fall-through */
 					case LEX_AND:
 						cur = ast_alloc_node(cur, AST_ISSET);
+						break;
+					default:
+						/* noop */
 						break;
 				}
 			}
@@ -264,9 +269,9 @@ bool build_parse_tree(
 
 			switch (lex_tok[*lex_idx]) {
 				case LEX_LITERAL:
-					// fall-through
+					/* fall-through */
 				case LEX_SLICE:
-					// fall-through
+					/* fall-through */
 				case LEX_CHILD_SEP:
 					cur = ast_alloc_node(cur, AST_INDEX_LIST);
 					parse_filter_list(lex_tok, lex_tok_values, lex_idx, lex_tok_count, cur);
@@ -277,6 +282,9 @@ bool build_parse_tree(
 				case LEX_EXPR_END:
 					strncpy(err->msg, "Filter must not be empty", sizeof(err->msg));
 					return false;
+				default:
+					/* noop */
+					break;
 			}
 
 			if (*lex_idx == lex_tok_count - 1 || lex_tok[(*lex_idx)+1] != LEX_EXPR_END) { /* last token */
@@ -367,6 +375,7 @@ bool build_parse_tree(
 			/* return call initiated by LEX_EXPR_START */
 			return true;
 		default:
+			assert(0);
 			break;
 		}
 	}
@@ -383,7 +392,7 @@ void parse_filter_list(
 ) {
 	int slice_count = 0;
 
-	/* assume filter type is an index list by default. this resolves type
+	/* assume filter type is an index list by default. this resolves type */
 	/* ambiguity of a filter containing no separators. */
 	/* example: treat level4[0] as an index filter, not a slice. */
 	tok->type = AST_INDEX_LIST;
@@ -445,6 +454,9 @@ operator_type get_token_type(enum ast_type type)
 	case AST_SELECTOR:
 		/* make eval ast return strings? */
 		return TYPE_OPERAND;
+	default:
+		assert(0);
+		return TYPE_OPERATOR;
 	}
 }
 
@@ -500,6 +512,9 @@ bool evaluate_postfix_expression(zval* arr, struct ast_node* tok)
 				}
 			}
 			break;
+		case TYPE_PAREN:
+			/* there should be no parens in the postfix expression */
+			assert(0);
 		}
 
 		tok = tok->next;
@@ -547,8 +562,8 @@ int get_operator_precedence(struct ast_node* tok)
 	case AST_LITERAL_BOOL:
 	case AST_BOOL:
 	default:
-		printf("Error, no operator precedence for %s", AST_STR[tok->type]);
-		break;
+		assert(0);
+		return -1;
 	}
 }
 
@@ -581,6 +596,9 @@ bool check_parens_balance(lex_token lex_tok[], int lex_tok_count)
 				}
 
 				stack_pop(&s);
+				break;
+			default:
+				assert(0);
 				break;
 		}
 	}

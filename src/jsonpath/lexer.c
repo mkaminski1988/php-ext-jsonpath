@@ -5,6 +5,7 @@
 #endif
 #include "safe_string.h"
 #include <stdbool.h>
+#include <stdio.h>
 
 static bool extract_quoted_literal(char* p, char* buffer, size_t bufSize, lex_error* err);
 static bool extract_unbounded_literal(char* p, char* buffer, size_t bufSize, lex_error* err);

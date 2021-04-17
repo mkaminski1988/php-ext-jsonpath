@@ -44,6 +44,9 @@ void eval_ast(zval* arr, struct ast_node* tok, zval* return_value)
         case AST_EXPR:
             exec_expression(arr, tok, return_value);
             return;
+        default:
+            assert(0);
+            break;
         }
     }
 }
@@ -293,6 +296,7 @@ zval* operand_to_zval(struct ast_node* src, zval* tmp_dest, zval* arr)
         return tmp_dest;
     } else {
         /* todo: runtime error */
+        return NULL;
     }
 }
 
@@ -309,6 +313,9 @@ bool evaluate_subexpression(
         return lh_operand->data.d_literal.value_bool && rh_operand->data.d_literal.value_bool;
     case AST_ISSET:
         return exec_selector_iterative(arr, lh_operand) != NULL;
+    default:
+        assert(0);
+        break;
     }
 
     /* use stack-allocated zvals in order to avoid malloc, if possible */
@@ -347,6 +354,9 @@ bool evaluate_subexpression(
         break;
 	case AST_RGXP:
 		ret = compare_rgxp(val_lh, val_rh);
+        break;
+    default:
+        assert(0);
         break;
 	}
 
