@@ -1,9 +1,6 @@
 #ifndef STACK_H
 #define STACK_H 1
 
-#include "lexer.h"
-#include "parser.h"
-
 // todo: enforce stack max check
 #define STACK_MAX 100
 

@@ -7,8 +7,21 @@
 #include "zend_exceptions.h"
 #include <ext/spl/spl_exceptions.h>
 
+bool convert_to_postfix(struct ast_node* expr_start);
 bool is_unary(enum ast_type);
 int get_operator_precedence(struct ast_node* tok);
+int get_operator_precedence(struct ast_node* tok);
+operator_type get_token_type(enum ast_type);
+struct ast_node* ast_alloc_node(struct ast_node* prev, enum ast_type type);
+void delete_expression_head_node(struct ast_node* expr);
+void parse_filter_list(lex_token lex_tok[PARSE_BUF_LEN],
+	char lex_tok_values[][PARSE_BUF_LEN],
+	int* start,
+	int lex_tok_count,
+	struct ast_node* tok);
+#ifdef JSONPATH_DEBUG
+void print_ast(struct ast_node* head, const char* m, int level);
+#endif
 
 const char* AST_STR[] = {
     "AST_AND",
@@ -578,4 +591,19 @@ bool check_parens_balance(lex_token lex_tok[], int lex_tok_count)
 	}
 
 	return true;
+}
+
+void free_ast_nodes(struct ast_node* head)
+{
+    if (head == NULL) {
+        return;
+    }
+
+    free_ast_nodes(head->next);
+
+    if (head->type == AST_EXPR) {
+        free_ast_nodes(head->data.d_expression.head);
+    }
+
+    efree((void*)head);
 }

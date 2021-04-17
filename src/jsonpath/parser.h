@@ -4,7 +4,7 @@
 #include <string.h>
 #include <stdlib.h>
 #include <stdbool.h>
-#include <Zend/zend_smart_str.h> /* todo where is zval defined? */
+#include "php.h"
 
 #define PARSE_BUF_LEN 50
 
@@ -44,21 +44,20 @@ extern const char* AST_STR[];
 
 union ast_node_data {
     struct {
+        struct ast_node* head;
+    } d_expression;
+    struct {
         int count;
-        union ast_node_data* names[3];
         int indexes[10]; /* todo check for max */
     } d_list;
-    struct {
-        char value[PARSE_BUF_LEN];
-        bool child_scope; /* @.selector if true, else $.selector */
-    } d_selector;
     struct {
         char value[PARSE_BUF_LEN];
         bool value_bool;
     } d_literal;
     struct {
-        struct ast_node* head;
-    } d_expression;
+        char value[PARSE_BUF_LEN];
+        bool child_scope; /* @.selector if true, else $.selector */
+    } d_selector;
 };
 
 struct ast_node {
@@ -72,18 +71,6 @@ typedef struct {
 } parse_error;
 
 bool evaluate_postfix_expression(zval* arr, struct ast_node* tok);
-operator_type get_token_type(enum ast_type);
-
-bool compare_lt(zval* lh, zval* rh);
-bool compare_lte(zval* lh, zval* rh);
-bool compare_gt(zval* lh, zval* rh);
-bool compare_gte(zval* lh, zval* rh);
-bool compare_and(zval* lh, zval* rh);
-bool compare_or(zval* lh, zval* rh);
-bool compare_eq(zval* lh, zval* rh);
-bool compare_neq(zval* lh, zval* rh);
-bool compare_isset(zval* lh, zval* rh);	// lh = rh
-bool compare_rgxp(zval* lh, zval* rh);
 
 bool evaluate_subexpression(
     zval* array,
@@ -100,14 +87,8 @@ bool build_parse_tree(
 	parse_error* err
 );
 
-void parse_filter_list(
-	lex_token lex_tok[PARSE_BUF_LEN],
-	char lex_tok_values[][PARSE_BUF_LEN],
-	int* start,
-	int lex_tok_count,
-	struct ast_node* tok
-);
-
 bool check_parens_balance(lex_token lex_tok[], int lex_tok_count);
+
+void free_ast_nodes(struct ast_node* head);
 
 #endif				/* PARSER_H */

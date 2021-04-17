@@ -1,7 +1,7 @@
 #ifndef LEXER_H
 #define LEXER_H 1
 
-#include <stdio.h>
+#include <stddef.h>
 
 typedef enum {
     LEX_NOT_FOUND,      /* Token not found */
