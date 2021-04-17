@@ -47,6 +47,19 @@ struct ast_node* ast_alloc_node(struct ast_node* prev, enum ast_type type)
 	return next;
 }
 
+void delete_expression_head_node(struct ast_node* expr)
+{
+	struct ast_node* tmp = expr->data.d_expression.head;
+
+	if (tmp == NULL) {
+		return;
+	}
+
+	expr->data.d_expression.head = expr->data.d_expression.head->next;
+
+	efree((void*)tmp);
+}
+
 #ifdef JSONPATH_DEBUG
 void print_ast(struct ast_node* head, const char* m, int level)
 {
@@ -335,9 +348,7 @@ bool build_parse_tree(
 			#endif
 
 			convert_to_postfix(cur->data.d_expression.head);
-
-			/* trim dummy head */
-			cur->data.d_expression.head = cur->data.d_expression.head->next;
+			delete_expression_head_node(cur);
 			break;
 		case LEX_EXPR_END:
 			/* return call initiated by LEX_EXPR_START */
