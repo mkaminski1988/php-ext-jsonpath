@@ -36,6 +36,7 @@ void print_lex_tokens(
     int lex_tok_count,
 	const char* m);
 #endif
+void free_allocs(struct ast_node* head);
 
 zend_class_entry* jsonpath_ce;
 
@@ -89,27 +90,31 @@ PHP_METHOD(JsonPath, find)
 
     array_init(return_value);
 
-    struct ast_node* next = head.next;
+    evaluateAST(search_target, head.next, return_value);
 
-    evaluateAST(search_target, next, return_value);
+    free_allocs(head.next);
 
-    // /* free the memory allocated for filter expressions */
-
-    // operator * fr = tok_ptr_start;
-
-    // while (fr <= tok_ptr_end) {
-    //     if (fr->filter_type == FLTR_EXPR) {
-    //         efree((void*)fr->expressions);
-    //     }
-    //     fr++;
-    // }
-
-    // /* return false if no results were found by the JSON-path query */
+    /* return false if no results were found by the JSON-path query */
 
     if (zend_hash_num_elements(HASH_OF(return_value)) == 0) {
         convert_to_boolean(return_value);
         RETURN_FALSE;
     }
+}
+
+void free_allocs(struct ast_node* head)
+{
+    if (head == NULL) {
+        return;
+    }
+
+    free_allocs(head->next);
+
+    if (head->type == AST_EXPR) {
+        free_allocs(head->data.d_expression.head);
+    }
+
+    efree((void*)head);
 }
 
 bool scanTokens(char* json_path, lex_token tok[], char tok_literals[][PARSE_BUF_LEN], int* tok_count)
