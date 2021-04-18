@@ -598,7 +598,7 @@ bool check_parens_balance(lex_token lex_tok[], int lex_tok_count)
 				stack_pop(&s);
 				break;
 			default:
-				assert(0);
+				/* not a paren, skip */
 				break;
 		}
 	}
