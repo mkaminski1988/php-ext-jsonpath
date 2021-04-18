@@ -6,4 +6,4 @@
 
 void eval_ast(zval* arr, struct ast_node* tok, zval* return_value);
 
-#endif				/* INTERPRETER_H */
+#endif /* INTERPRETER_H */
