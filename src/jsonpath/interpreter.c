@@ -314,7 +314,7 @@ bool evaluate_subexpression(
     case AST_ISSET:
         return exec_selector_iterative(arr, lh_operand) != NULL;
     default:
-        assert(0);
+        /* noop */
         break;
     }
 
