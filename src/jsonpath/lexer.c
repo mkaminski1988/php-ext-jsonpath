@@ -85,7 +85,7 @@ bool scan(char** p, struct jpath_token* token, char* json_path) {
           case '\0':
             /* The whole expression can end with a recursive descent operator, but not with a dot selector */
             if (*(*p - 2) != '.') {
-              raise_error("Dot selector must be followed by a node name or wildcard", json_path, *p - 1);
+              raise_error("Dot selector `.` must be followed by a node name or wildcard", json_path, *p - 1);
               return false;
             }
             return true;
@@ -152,7 +152,7 @@ bool scan(char** p, struct jpath_token* token, char* json_path) {
         } else if (CUR_CHAR() == '~') {
           token->type = LEX_RGXP;
         } else {
-          raise_error("Invalid character after '='. Valid values: '==', '!~'.", json_path, *p);
+          raise_error("Invalid character after `=`, valid values are `==` and `=~`", json_path, *p);
           return false;
         }
         NEXT_CHAR();
@@ -270,7 +270,7 @@ static bool extract_quoted_literal(char** p, char* json_path, struct jpath_token
   char* start = *p;
 
   for (; (CUR_CHAR() == '\'' || CUR_CHAR() == '"' || CUR_CHAR() == ' '); NEXT_CHAR()) {
-    // Find first occurrence
+    /* Find first occurrence of single or double quote */
     if (CUR_CHAR() == '\'' || CUR_CHAR() == '"') {
       quote_found = true;
       quote_type = CUR_CHAR();
