@@ -31,6 +31,7 @@ void eval_ast(zval* arr_head, zval* arr_cur, struct ast_node* tok, zval* return_
     case AST_INDEX_SLICE:
       exec_slice(arr_head, arr_cur, tok, return_value);
       break;
+    case AST_CUR_NODE:
     case AST_ROOT:
       copy_result_or_continue(arr_head, arr_cur, tok, return_value);
       break;
