@@ -317,7 +317,7 @@ bool evaluate_expression(zval* arr_head, zval* arr_cur, struct ast_node* tok) {
     return evaluate_unary(arr_head, arr_cur, tok);
   }
 
-  if (tok->type == AST_SELECTOR) {
+  if (tok->type == AST_SELECTOR || tok->type == AST_CUR_NODE) {
     zval tmp = {0};
     return Z_TYPE_P(evaluate_primary(tok, &tmp, arr_head, arr_cur)) != IS_UNDEF;
   }
@@ -339,7 +339,7 @@ bool evaluate_unary(zval* arr_head, zval* arr_cur, struct ast_node* tok) {
     return !evaluate_unary(arr_head, arr_cur, tok->data.d_unary.right);
   } else if (is_binary(tok->data.d_unary.right->type)) {
     return !evaluate_binary(arr_head, arr_cur, tok->data.d_unary.right);
-  } else if (tok->data.d_unary.right->type == AST_SELECTOR) {
+  } else if (tok->data.d_unary.right->type == AST_SELECTOR || tok->data.d_unary.right->type == AST_CUR_NODE) {
     /* ?(!@.selector) */
     return Z_TYPE_P(evaluate_primary(tok->data.d_unary.right, &tmp, arr_head, arr_cur)) == IS_UNDEF;
   }
@@ -365,7 +365,8 @@ bool evaluate_binary(zval* arr_head, zval* arr_cur, struct ast_node* tok) {
   } else if (is_unary(tok->type)) {
     bool result = evaluate_unary(arr_head, arr_cur, lh_operand);
     ZVAL_BOOL(val_lh, result);
-  } else if (lh_operand->type == AST_SELECTOR && (tok->type == AST_OR || tok->type == AST_AND)) {
+  } else if ((lh_operand->type == AST_SELECTOR || lh_operand->type == AST_CUR_NODE) &&
+             (tok->type == AST_OR || tok->type == AST_AND)) {
     /* ?(@.selector <or|and> [operand]) */
     bool exists = Z_TYPE_P(evaluate_primary(lh_operand, &tmp_lh, arr_head, arr_cur)) != IS_UNDEF;
     ZVAL_BOOL(val_lh, exists);
@@ -379,7 +380,8 @@ bool evaluate_binary(zval* arr_head, zval* arr_cur, struct ast_node* tok) {
   } else if (is_unary(tok->type)) {
     bool result = evaluate_unary(arr_head, arr_cur, rh_operand);
     ZVAL_BOOL(val_rh, result);
-  } else if (rh_operand->type == AST_SELECTOR && (tok->type == AST_OR || tok->type == AST_AND)) {
+  } else if ((rh_operand->type == AST_SELECTOR || rh_operand->type == AST_CUR_NODE) &&
+             (tok->type == AST_OR || tok->type == AST_AND)) {
     /* ?([operand] <or|and> @.selector) */
     bool exists = Z_TYPE_P(evaluate_primary(rh_operand, &tmp_rh, arr_head, arr_cur)) != IS_UNDEF;
     ZVAL_BOOL(val_rh, exists);
