@@ -320,9 +320,6 @@ static struct ast_node* parse_unary(PARSER_PARAMS) {
 }
 
 static struct ast_node* parse_primary(PARSER_PARAMS) {
-  if (CUR_TOKEN() == LEX_CUR_NODE) {
-    CONSUME_TOKEN();
-  }
 
   if (CUR_TOKEN() == LEX_LITERAL) {
     struct ast_node* ret = ast_alloc_node(NULL, AST_LITERAL);
