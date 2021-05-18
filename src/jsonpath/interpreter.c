@@ -274,6 +274,7 @@ zval* evaluate_primary(struct ast_node* src, zval* tmp_dest, zval* arr_head, zva
         return tmp_dest;
       }
       return Z_INDIRECT_P(tmp_dest);
+    case AST_CUR_NODE:
     case AST_SELECTOR:
       ZVAL_INDIRECT(tmp_dest, NULL);
       eval_ast(arr_head, arr_cur, src, tmp_dest);

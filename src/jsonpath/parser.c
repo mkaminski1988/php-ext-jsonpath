@@ -76,7 +76,7 @@ bool build_parse_tree(PARSER_PARAMS, struct ast_node* head) {
         cur = ast_alloc_node(cur, AST_RECURSE);
         break;
       case LEX_CUR_NODE:
-        cur = ast_alloc_node(cur, AST_CUR_NODE);
+        /* noop */
         break;
       case LEX_NODE:
         /* fall-through */
@@ -320,7 +320,6 @@ static struct ast_node* parse_unary(PARSER_PARAMS) {
 }
 
 static struct ast_node* parse_primary(PARSER_PARAMS) {
-
   if (CUR_TOKEN() == LEX_LITERAL) {
     struct ast_node* ret = ast_alloc_node(NULL, AST_LITERAL);
 
@@ -513,7 +512,7 @@ bool validate_expression_head(struct ast_node* tok) {
     return true;
   }
 
-  if (tok->type == AST_SELECTOR) {
+  if (tok->type == AST_SELECTOR || tok->type == AST_CUR_NODE) {
     return true;
   }
 
