@@ -34,11 +34,11 @@ static bool numeric_to_long(char* str, int str_len, long* dest);
 static bool is_operator(lex_token type);
 static bool make_numeric_node(struct ast_node* tok, char* str, int str_len);
 
-const char* AST_STR[] = {"AST_AND",  "AST_BOOL", "AST_DOUBLE",     "AST_EQ",          "AST_EXPR",
-                         "AST_GT",   "AST_GTE",  "AST_INDEX_LIST", "AST_INDEX_SLICE", "AST_LITERAL",
-                         "AST_LONG", "AST_LT",   "AST_LTE",        "AST_NE",          "AST_NEGATION",
-                         "AST_NULL", "AST_OR",   "AST_PAREN_LEFT", "AST_PAREN_RIGHT", "AST_RECURSE",
-                         "AST_RGXP", "AST_ROOT", "AST_SELECTOR",   "AST_WILD_CARD"};
+const char* AST_STR[] = {"AST_AND",      "AST_BOOL", "AST_CUR_NODE", "AST_DOUBLE",     "AST_EQ",
+                         "AST_EXPR",     "AST_GT",   "AST_GTE",      "AST_INDEX_LIST", "AST_INDEX_SLICE",
+                         "AST_LITERAL",  "AST_LONG", "AST_LT",       "AST_LTE",        "AST_NE",
+                         "AST_NEGATION", "AST_NULL", "AST_OR",       "AST_PAREN_LEFT", "AST_PAREN_RIGHT",
+                         "AST_RECURSE",  "AST_RGXP", "AST_ROOT",     "AST_SELECTOR",   "AST_WILD_CARD"};
 
 static struct ast_node* ast_alloc_binary(enum ast_type type, struct ast_node* left, struct ast_node* right) {
   struct ast_node* node = ast_alloc_node(NULL, type);
@@ -76,7 +76,7 @@ bool build_parse_tree(PARSER_PARAMS, struct ast_node* head) {
         cur = ast_alloc_node(cur, AST_RECURSE);
         break;
       case LEX_CUR_NODE:
-        /* noop */
+        cur = ast_alloc_node(cur, AST_CUR_NODE);
         break;
       case LEX_NODE:
         /* fall-through */
@@ -365,9 +365,15 @@ static struct ast_node* parse_primary(PARSER_PARAMS) {
     return ret;
   }
 
-  if (CUR_TOKEN() == LEX_NODE) {
+  if (CUR_TOKEN() == LEX_NODE || CUR_TOKEN() == LEX_CUR_NODE) {
     struct ast_node* ret = NULL;
     struct ast_node* tail = NULL;
+
+    if (CUR_TOKEN() == LEX_CUR_NODE) {
+      CONSUME_TOKEN();
+      ret = ast_alloc_node(NULL, AST_CUR_NODE);
+      tail = ret;
+    }
 
     /* handle @.node */
     while (CUR_TOKEN() == LEX_NODE) {
